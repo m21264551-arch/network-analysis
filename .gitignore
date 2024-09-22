@@ -5,8 +5,14 @@
 !.env.example
 !.env.sample
 .DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
 node_modules/
 .venv/
+venv/
+env/
 dist/
 build/
 .vercel/

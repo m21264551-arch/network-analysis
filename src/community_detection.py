@@ -1,122 +1,123 @@
 """
-community_detection.py — Multiple community detection algorithms with evaluation.
+Run community detection algorithms and evaluate their partitions.
 
-Implements Louvain, Label Propagation, Girvan-Newman, and spectral clustering,
-then evaluates results against ground truth using NMI and modularity.
+Includes Louvain, Label Propagation, Girvan-Newman, and spectral clustering.
+Partitions are evaluated with modularity, NMI, and ARI when ground truth labels
+are available.
 """
+
+from collections import defaultdict
+from typing import Dict, Tuple
 
 import networkx as nx
 import numpy as np
-from collections import defaultdict
-from typing import Dict, List, Tuple
-
-try:
-    import community as community_louvain  # python-louvain
-except ImportError:
-    community_louvain = None
-
-from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score
+from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
 
 
-# ──────────────────────────────────────────────
-# Detection Algorithms
-# ──────────────────────────────────────────────
+# Detection algorithms
 
 def louvain(G: nx.Graph, resolution: float = 1.0, seed: int = 42) -> Dict[int, int]:
     """
-    Louvain method for community detection.
-    
-    Greedy modularity optimisation — fast, scalable, widely used in industry.
-    Returns dict mapping node → community_id.
+    Run Louvain community detection.
+
+    This uses NetworkX's built-in implementation, so the project does not need
+    a separate python-louvain dependency.
     """
-    if community_louvain is None:
-        raise ImportError("Install python-louvain: pip install python-louvain")
-    return community_louvain.best_partition(G, resolution=resolution, random_state=seed)
+    communities = nx.algorithms.community.louvain_communities(
+        G,
+        resolution=resolution,
+        seed=seed,
+    )
+    return _communities_to_partition(communities)
 
 
 def label_propagation(G: nx.Graph) -> Dict[int, int]:
     """
-    Label Propagation Algorithm (LPA).
-    
-    Near-linear time, no parameters — each node adopts the majority
-    label of its neighbours until convergence.
+    Run Label Propagation.
+
+    This near-linear algorithm has no tuning parameters. Each node adopts the
+    majority label of its neighbours until the labels stabilise.
     """
     communities = nx.algorithms.community.label_propagation_communities(G)
-    partition = {}
-    for comm_id, members in enumerate(communities):
-        for node in members:
-            partition[node] = comm_id
-    return partition
+    return _communities_to_partition(communities)
 
 
 def girvan_newman(G: nx.Graph, k: int = 5) -> Dict[int, int]:
-    """
-    Girvan-Newman algorithm — iteratively removes highest-betweenness edges.
-    
-    Parameters
-    ----------
-    k : int – Target number of communities
-    """
-    comp = nx.algorithms.community.girvan_newman(G)
-    for communities in comp:
-        if len(communities) >= k:
+    """Run Girvan-Newman until at least ``k`` communities are found."""
+    target = _normalise_k(G, k)
+    if target == 0:
+        return {}
+    if target == 1:
+        return {node: 0 for node in G.nodes()}
+    if G.number_of_edges() == 0:
+        return {node: idx for idx, node in enumerate(G.nodes())}
+
+    communities = tuple(nx.connected_components(G))
+    if len(communities) >= target:
+        return _communities_to_partition(communities)
+
+    for communities in nx.algorithms.community.girvan_newman(G):
+        if len(communities) >= target:
             break
 
-    partition = {}
-    for comm_id, members in enumerate(communities):
-        for node in members:
-            partition[node] = comm_id
-    return partition
+    return _communities_to_partition(communities)
 
 
 def spectral_clustering(G: nx.Graph, k: int = 5) -> Dict[int, int]:
     """
-    Spectral clustering on the graph Laplacian.
-    
-    Uses eigenvectors of the normalised Laplacian + k-means.
+    Run spectral clustering on the graph Laplacian.
+
+    The graph is embedded with the smallest non-trivial eigenvectors of the
+    normalised Laplacian, then clustered with k-means.
     """
     from sklearn.cluster import KMeans
 
-    L = nx.normalized_laplacian_matrix(G).toarray()
-    eigenvalues, eigenvectors = np.linalg.eigh(L)
-    # Take the first k non-trivial eigenvectors
-    features = eigenvectors[:, 1 : k + 1]
+    target = _normalise_k(G, k)
+    if target == 0:
+        return {}
+    if target == 1:
+        return {node: 0 for node in G.nodes()}
 
-    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+    laplacian = nx.normalized_laplacian_matrix(G).toarray()
+    _, eigenvectors = np.linalg.eigh(laplacian)
+    features = eigenvectors[:, 1 : target + 1]
+
+    kmeans = KMeans(n_clusters=target, random_state=42, n_init=10)
     labels = kmeans.fit_predict(features)
 
     nodes = list(G.nodes())
     return {nodes[i]: int(labels[i]) for i in range(len(nodes))}
 
 
-# ──────────────────────────────────────────────
 # Evaluation
-# ──────────────────────────────────────────────
 
 def evaluate_partition(
-    G: nx.Graph, partition: Dict[int, int], ground_truth_attr: str = "ground_truth"
+    G: nx.Graph,
+    partition: Dict[int, int],
+    ground_truth_attr: str = "ground_truth",
 ) -> dict:
     """
-    Evaluate a community partition against ground truth.
-    
-    Metrics
-    -------
-    - Modularity (no ground truth needed)
-    - Normalised Mutual Information (NMI)
-    - Adjusted Rand Index (ARI)
-    """
-    # Modularity
-    communities = defaultdict(set)
-    for node, comm in partition.items():
-        communities[comm].add(node)
-    modularity = nx.algorithms.community.modularity(G, communities.values())
+    Evaluate a community partition against ground truth when labels exist.
 
-    # Ground-truth comparison
-    gt = nx.get_node_attributes(G, ground_truth_attr)
-    if gt:
-        nodes = sorted(set(partition.keys()) & set(gt.keys()))
+    Metrics include modularity, Normalised Mutual Information, and Adjusted
+    Rand Index.
+    """
+    communities = defaultdict(set)
+    for node in G.nodes():
+        comm = partition.get(node, f"singleton_{node}")
+        communities[comm].add(node)
+
+    modularity = (
+        nx.algorithms.community.modularity(G, communities.values())
+        if G.number_of_edges() > 0 and communities
+        else 0
+    )
+
+    ground_truth = nx.get_node_attributes(G, ground_truth_attr)
+    if ground_truth:
+        nodes = sorted(set(partition.keys()) & set(ground_truth.keys()))
         pred = [partition[n] for n in nodes]
-        true = [gt[n] for n in nodes]
+        true = [ground_truth[n] for n in nodes]
         nmi = normalized_mutual_info_score(true, pred)
         ari = adjusted_rand_score(true, pred)
     else:
@@ -132,14 +133,11 @@ def evaluate_partition(
 
 def run_all_detectors(G: nx.Graph, k: int = 5) -> Dict[str, Tuple[Dict, dict]]:
     """
-    Run all community detection algorithms and return partitions + metrics.
-    
-    Returns
-    -------
-    dict mapping algorithm_name → (partition_dict, evaluation_metrics)
+    Run every detector and return partitions with evaluation metrics.
+
+    Returns a dictionary mapping algorithm names to ``(partition, metrics)``.
     """
     results = {}
-
     detectors = {
         "Louvain": lambda: louvain(G),
         "Label Propagation": lambda: label_propagation(G),
@@ -152,7 +150,23 @@ def run_all_detectors(G: nx.Graph, k: int = 5) -> Dict[str, Tuple[Dict, dict]]:
             partition = detect_fn()
             metrics = evaluate_partition(G, partition)
             results[name] = (partition, metrics)
-        except Exception as e:
-            print(f"[WARN] {name} failed: {e}")
+        except Exception as exc:
+            print(f"[WARN] {name} failed: {exc}")
 
     return results
+
+
+def _normalise_k(G: nx.Graph, k: int) -> int:
+    """Clamp a requested community count to a valid range for the graph."""
+    if G.number_of_nodes() == 0:
+        return 0
+    return min(max(1, int(k)), G.number_of_nodes())
+
+
+def _communities_to_partition(communities) -> Dict[int, int]:
+    """Convert an iterable of node communities into a node partition mapping."""
+    partition = {}
+    for comm_id, members in enumerate(communities):
+        for node in members:
+            partition[node] = comm_id
+    return partition

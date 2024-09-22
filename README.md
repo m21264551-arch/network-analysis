@@ -40,6 +40,12 @@ python main.py --dataset lfr --nodes 500
 python main.py --dataset karate
 ```
 
+## Tests
+
+```bash
+pytest
+```
+
 ## Repository map
 
 ```text
@@ -69,3 +75,7 @@ outputs/                        Generated figures
   <img src="outputs/link_pred_importances.png" width="600" alt="Link prediction feature importances">
   <br><em>Link prediction feature importance</em>
 </p>
+
+## License
+
+MIT

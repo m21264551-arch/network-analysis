@@ -1,8 +1,8 @@
 """
-main.py — End-to-end NetDetect pipeline.
+End-to-end NetDetect pipeline.
 
-Runs the full analysis: graph construction → community detection →
-centrality analysis → influence propagation → link prediction → visualisations.
+Runs graph construction, community detection, centrality analysis, influence
+propagation, link prediction, and plot generation.
 
 Usage
 -----
@@ -13,118 +13,136 @@ import argparse
 import sys
 from pathlib import Path
 
-# Ensure src/ is importable
+import matplotlib
+
+matplotlib.use("Agg")
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from src.network_builder import (
-    generate_stochastic_block_model,
-    generate_lfr_benchmark,
-    load_karate_club,
-    get_network_summary,
-)
 from src.community_detection import run_all_detectors
-from src.influence_analysis import compute_centralities, compare_seed_strategies
-from src.link_prediction import train_test_split_edges, evaluate_heuristics, train_link_predictor
-from src.visualisation import (
-    plot_network_communities,
-    plot_detection_comparison,
-    plot_centrality_distributions,
-    plot_centrality_correlation,
-    plot_influence_comparison,
-    plot_feature_importances,
-    plot_degree_distribution,
+from src.influence_analysis import compare_seed_strategies, compute_centralities
+from src.link_prediction import (
+    evaluate_heuristics,
+    train_link_predictor,
+    train_test_split_edges,
 )
-
-import matplotlib
-matplotlib.use("Agg")
+from src.network_builder import (
+    generate_lfr_benchmark,
+    generate_stochastic_block_model,
+    get_network_summary,
+    load_karate_club,
+)
+from src.visualisation import (
+    plot_centrality_correlation,
+    plot_centrality_distributions,
+    plot_degree_distribution,
+    plot_detection_comparison,
+    plot_feature_importances,
+    plot_influence_comparison,
+    plot_network_communities,
+)
 
 
 def main(dataset: str = "sbm", n_nodes: int = 300, output_dir: str = "outputs"):
+    """Run the full analysis pipeline and return the main result objects."""
     out = Path(output_dir)
-    out.mkdir(exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
 
-    # ── 1. Build Network ──────────────────────────
     print("=" * 60)
-    print("  NetDetect — Social Network Analysis Pipeline")
+    print("  NetDetect Social Network Analysis Pipeline")
     print("=" * 60)
-    print(f"\n[1/6] Building network ({dataset}, n={n_nodes})...")
 
-    if dataset == "sbm":
-        G = generate_stochastic_block_model(
-            sizes=[n_nodes // 5] * 5, p_intra=0.25, p_inter=0.01
-        )
-    elif dataset == "lfr":
-        G = generate_lfr_benchmark(n=n_nodes)
-    elif dataset == "karate":
-        G = load_karate_club()
-    else:
-        raise ValueError(f"Unknown dataset: {dataset}")
+    node_label = f", n={n_nodes}" if dataset != "karate" else ""
+    print(f"\n[1/6] Building network ({dataset}{node_label})...")
+    G = _build_graph(dataset, n_nodes)
 
     summary = get_network_summary(G)
-    for k, v in summary.items():
-        print(f"  {k:20s}: {v}")
+    for key, value in summary.items():
+        print(f"  {key:20s}: {value}")
 
     plot_degree_distribution(G, save_path=str(out / "degree_distribution.png"))
-    print("  ✓ Degree distribution saved")
+    print("  [ok] Degree distribution saved")
 
-    # ── 2. Community Detection ────────────────────
-    print(f"\n[2/6] Running community detection algorithms...")
-    n_communities = len(set(
-        v for v in dict(G.nodes(data="ground_truth")).values() if v is not None
-    ))
-    k = max(n_communities, 3)
+    print("\n[2/6] Running community detection algorithms...")
+    k = _community_count_for_detection(G)
     results = run_all_detectors(G, k=k)
+    if not results:
+        raise RuntimeError("No community detection algorithms completed successfully")
 
-    for name, (partition, metrics) in results.items():
-        print(f"  {name:25s} | Modularity={metrics['modularity']:.4f}  "
-              f"NMI={metrics['nmi']}  Communities={metrics['num_communities']}")
+    for name, (_, metrics) in results.items():
+        print(
+            f"  {name:25s} | Modularity={metrics['modularity']:.4f}  "
+            f"NMI={metrics['nmi']}  Communities={metrics['num_communities']}"
+        )
 
-    # Use Louvain partition for visualisation
     best_name = max(results, key=lambda n: results[n][1]["modularity"])
     best_partition = results[best_name][0]
 
-    plot_network_communities(G, best_partition, title=f"Communities ({best_name})",
-                             save_path=str(out / "network_communities.png"))
+    plot_network_communities(
+        G,
+        best_partition,
+        title=f"Communities ({best_name})",
+        save_path=str(out / "network_communities.png"),
+    )
     plot_detection_comparison(results, save_path=str(out / "detection_comparison.png"))
-    print("  ✓ Community plots saved")
+    print("  [ok] Community plots saved")
 
-    # ── 3. Centrality Analysis ────────────────────
-    print(f"\n[3/6] Computing centrality measures...")
+    print("\n[3/6] Computing centrality measures...")
     centrality_df = compute_centralities(G)
-    print(f"  Top 5 by PageRank:")
+    print("  Top 5 by PageRank:")
     print(centrality_df.head().to_string(float_format="{:.4f}".format))
 
-    plot_centrality_distributions(centrality_df, save_path=str(out / "centrality_distributions.png"))
-    plot_centrality_correlation(centrality_df, save_path=str(out / "centrality_correlation.png"))
-    print("  ✓ Centrality plots saved")
+    plot_centrality_distributions(
+        centrality_df,
+        save_path=str(out / "centrality_distributions.png"),
+    )
+    plot_centrality_correlation(
+        centrality_df,
+        save_path=str(out / "centrality_correlation.png"),
+    )
+    print("  [ok] Centrality plots saved")
 
-    # ── 4. Influence Propagation ──────────────────
-    print(f"\n[4/6] Simulating influence propagation (Independent Cascade)...")
-    comparison = compare_seed_strategies(G, centrality_df, seed_size=5, propagation_prob=0.1)
+    print("\n[4/6] Simulating influence propagation...")
+    comparison = compare_seed_strategies(
+        G,
+        centrality_df,
+        seed_size=5,
+        propagation_prob=0.1,
+    )
     print(comparison.to_string(index=False))
 
     plot_influence_comparison(comparison, save_path=str(out / "influence_comparison.png"))
-    print("  ✓ Influence plot saved")
+    print("  [ok] Influence plot saved")
 
-    # ── 5. Link Prediction ────────────────────────
-    print(f"\n[5/6] Running link prediction experiments...")
+    print("\n[5/6] Running link prediction experiments...")
     G_train, test_pos, test_neg = train_test_split_edges(G, test_fraction=0.15)
-    print(f"  Train edges: {G_train.number_of_edges()}  |  "
-          f"Test +: {len(test_pos)}  |  Test -: {len(test_neg)}")
+    print(
+        f"  Train edges: {G_train.number_of_edges()}  |  "
+        f"Test +: {len(test_pos)}  |  Test -: {len(test_neg)}"
+    )
 
     heuristic_results = evaluate_heuristics(G_train, test_pos, test_neg)
-    print("\n  Heuristic Methods:")
+    print("\n  Heuristic methods:")
     print(heuristic_results.to_string(index=False))
 
     ml_results = train_link_predictor(G_train, test_pos, test_neg)
-    print(f"\n  Gradient Boosting  |  CV AUC = {ml_results['mean_auc']:.4f} ± {ml_results['std_auc']:.4f}")
+    cv_mean = ml_results["cv_mean_auc"]
+    cv_std = ml_results["cv_std_auc"]
+    cv_text = "not available" if cv_mean is None else f"{cv_mean:.4f} +/- {cv_std:.4f}"
+    print(
+        "\n  Gradient Boosting"
+        f"  |  Holdout AUC = {ml_results['test_auc']:.4f}"
+        f"  |  Avg Precision = {ml_results['test_average_precision']:.4f}"
+        f"  |  Train CV AUC = {cv_text}"
+    )
 
-    plot_feature_importances(ml_results["feature_importances"],
-                             save_path=str(out / "link_pred_importances.png"))
-    print("  ✓ Link prediction plot saved")
+    plot_feature_importances(
+        ml_results["feature_importances"],
+        save_path=str(out / "link_pred_importances.png"),
+    )
+    print("  [ok] Link prediction plot saved")
 
-    # ── 6. Summary ────────────────────────────────
-    print(f"\n[6/6] Pipeline complete!")
+    print("\n[6/6] Pipeline complete")
     print(f"  All outputs saved to: {out.resolve()}")
     print("=" * 60)
 
@@ -134,12 +152,54 @@ def main(dataset: str = "sbm", n_nodes: int = 300, output_dir: str = "outputs"):
         "top_influencers": centrality_df.head(10),
         "influence_comparison": comparison,
         "heuristic_link_pred": heuristic_results,
-        "ml_link_pred_auc": ml_results["mean_auc"],
+        "ml_link_pred_auc": ml_results["test_auc"],
     }
 
 
+def _build_graph(dataset: str, n_nodes: int):
+    """Build a graph for the selected dataset."""
+    if dataset == "sbm":
+        return generate_stochastic_block_model(
+            sizes=_balanced_community_sizes(n_nodes, 5),
+            p_intra=0.25,
+            p_inter=0.01,
+        )
+    if dataset == "lfr":
+        return generate_lfr_benchmark(n=n_nodes)
+    if dataset == "karate":
+        return load_karate_club()
+    raise ValueError(f"Unknown dataset: {dataset}")
+
+
+def _balanced_community_sizes(n_nodes: int, num_communities: int = 5) -> list[int]:
+    """Split ``n_nodes`` across communities while preserving the exact total."""
+    if n_nodes <= 0:
+        raise ValueError("n_nodes must be positive")
+
+    num_communities = min(num_communities, n_nodes)
+    base_size, remainder = divmod(n_nodes, num_communities)
+    return [
+        base_size + (1 if index < remainder else 0)
+        for index in range(num_communities)
+    ]
+
+
+def _community_count_for_detection(G) -> int:
+    """Pick a valid community count for algorithms that require k."""
+    ground_truth = {
+        value
+        for value in dict(G.nodes(data="ground_truth")).values()
+        if value is not None
+    }
+    if ground_truth:
+        return min(len(ground_truth), G.number_of_nodes())
+    return min(3, G.number_of_nodes())
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="NetDetect — Network Analysis Pipeline")
+    parser = argparse.ArgumentParser(
+        description="NetDetect Social Network Analysis Pipeline",
+    )
     parser.add_argument("--dataset", choices=["sbm", "lfr", "karate"], default="sbm")
     parser.add_argument("--nodes", type=int, default=300)
     parser.add_argument("--output", type=str, default="outputs")
