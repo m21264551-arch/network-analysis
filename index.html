@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="Network Analysis Toolkit: a compact interactive graph explorer for community detection, influence, and link prediction outputs."
+    >
+    <title>Network Analysis Toolkit</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='6' width='52' height='52' rx='8' fill='white' stroke='%23dce4e2' stroke-width='3'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-family='Arial,sans-serif' font-size='20' font-weight='800' fill='%2300746d'%3ENA%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="site-shell">
+      <div class="app-shell">
+        <header class="topbar" aria-label="Network Analysis Toolkit">
+          <a class="brand-block" href="#overview" aria-label="Network Analysis Toolkit home">
+            <span class="brand-mark" aria-hidden="true">NA</span>
+            <span>
+              <strong>Network Analysis Toolkit</strong>
+              <span class="brand-subtitle">Interactive graph analysis explorer</span>
+            </span>
+          </a>
+
+          <div class="topbar-title">
+            <h1>Community detection, influence spread, and link prediction</h1>
+            <span>Client-side explorer generated from a reproducible Python pipeline</span>
+          </div>
+
+          <div class="topbar-actions">
+            <span class="run-state is-ready">
+              <span class="status-dot"></span>
+              Ready
+            </span>
+            <a href="https://github.com/m21264551-arch/network-analysis" target="_blank" rel="noreferrer">GitHub</a>
+          </div>
+        </header>
+
+        <aside class="panel control-panel" aria-label="Graph controls">
+          <section class="field-group">
+            <label>View</label>
+            <div class="tab-stack" role="tablist" aria-label="Analysis view">
+              <button class="is-active" type="button" role="tab" aria-selected="true" data-tab="overview">Overview</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="communities">Communities</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="influence">Influence</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="links">Link Prediction</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="methods">Methods</button>
+            </div>
+          </section>
+
+          <section class="field-group">
+            <label>Size nodes by</label>
+            <div class="segmented" role="group" aria-label="Node size metric">
+              <button class="segment is-active" type="button" data-size-metric="pagerank">PageRank</button>
+              <button class="segment" type="button" data-size-metric="degree">Degree</button>
+              <button class="segment" type="button" data-size-metric="betweenness">Betweenness</button>
+            </div>
+          </section>
+
+          <section class="field-group">
+            <label>Community filter</label>
+            <div class="community-filter" id="community-filter" aria-label="Filter graph by community"></div>
+          </section>
+
+          <section class="field-group">
+            <label>Run source</label>
+            <p>Python builds the graph data and metrics; this page keeps the browser focused on inspection.</p>
+          </section>
+        </aside>
+
+        <section id="overview" class="visual-panel primary-panel" aria-label="Selected analysis">
+          <div class="canvas-toolbar">
+            <div>
+              <span id="main-kicker">Interactive Graph Explorer</span>
+              <h2 id="main-title">Karate Club Network</h2>
+            </div>
+            <div class="view-controls" aria-label="Figure controls">
+              <button class="icon-button" id="zoom-toggle" type="button" title="Expand panel" aria-label="Expand panel">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M10.5 18a7.5 7.5 0 1 1 5.3-12.8A7.5 7.5 0 0 1 10.5 18Z"></path>
+                  <path d="m16 16 5 5M10.5 7v7M7 10.5h7"></path>
+                </svg>
+              </button>
+              <button class="icon-button" id="download-current" type="button" title="Download current asset" aria-label="Download current asset">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M12 3v12"></path>
+                  <path d="m7 10 5 5 5-5"></path>
+                  <path d="M5 20h14"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <figure class="main-figure">
+            <div class="network-explorer" id="network-explorer">
+              <div class="network-stage">
+                <svg id="network-svg" class="network-svg" role="img" aria-label="Interactive karate club network by detected community"></svg>
+                <div class="node-tooltip" id="node-tooltip" hidden></div>
+              </div>
+            </div>
+            <img class="main-image is-hidden" id="main-image" src="outputs/network_communities.png" alt="Network graph coloured by detected community">
+            <div class="main-chart is-hidden" id="main-chart"></div>
+          </figure>
+        </section>
+
+        <aside class="panel metrics-panel" aria-label="Insights and key metrics">
+          <section class="metrics-section">
+            <h2>Insight</h2>
+            <h3 id="insight-title">Hover nodes to inspect influence and community membership</h3>
+            <p class="insight-copy" id="insight-copy">
+              The graph is exported from the Python pipeline as JSON and rendered client-side with hover, filtering, and centrality-based node sizing.
+            </p>
+          </section>
+
+          <section class="metrics-section">
+            <h2>Selected Metrics</h2>
+            <dl class="stat-list" id="stat-list">
+              <div><dt>Nodes</dt><dd>34</dd></div>
+              <div><dt>Edges</dt><dd>78</dd></div>
+              <div><dt>Communities</dt><dd>4</dd></div>
+              <div><dt>Modularity</dt><dd>0.4266</dd></div>
+            </dl>
+          </section>
+
+          <section class="metrics-section">
+            <h2>Pipeline note</h2>
+            <div class="run-card">
+              <span class="run-status" aria-hidden="true"></span>
+              <span id="run-note">Data source: data/network-karate.json</span>
+            </div>
+          </section>
+        </aside>
+
+        <section class="insight-bar">
+          <div class="insight-icon" aria-hidden="true">N</div>
+          <div>
+            <h2>Less dashboard, more explorer</h2>
+            <p>The first screen now gives the graph room to breathe and keeps controls where they are expected: views on the left, metrics on the right.</p>
+          </div>
+          <div class="tip">
+            <strong>Tip</strong>
+            <span>Hover a node, switch sizing, or filter by community to inspect the analysis without scrolling past extra cards.</span>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>

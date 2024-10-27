@@ -1,0 +1,800 @@
+{
+  "dataset": "Zachary's Karate Club",
+  "source": "networkx.karate_club_graph",
+  "summary": {
+    "nodes": 34,
+    "edges": 78,
+    "density": 0.139,
+    "avgClustering": 0.5706,
+    "avgDegree": 4.59,
+    "components": 1
+  },
+  "communityMetrics": {
+    "num_communities": 4,
+    "modularity": 0.4266,
+    "nmi": 0.5942,
+    "ari": 0.4905
+  },
+  "nodes": [
+    {
+      "id": 0,
+      "community": 1,
+      "club": "Mr. Hi",
+      "degree": 16,
+      "x": -0.002593,
+      "y": 0.352023,
+      "degreeCentrality": 0.484848,
+      "betweenness": 0.437635,
+      "eigenvector": 0.355483,
+      "pagerank": 0.088508
+    },
+    {
+      "id": 1,
+      "community": 0,
+      "club": "Mr. Hi",
+      "degree": 9,
+      "x": -0.10321,
+      "y": 0.224557,
+      "degreeCentrality": 0.272727,
+      "betweenness": 0.053937,
+      "eigenvector": 0.265954,
+      "pagerank": 0.057415
+    },
+    {
+      "id": 2,
+      "community": 0,
+      "club": "Mr. Hi",
+      "degree": 10,
+      "x": -0.051523,
+      "y": 0.024809,
+      "degreeCentrality": 0.30303,
+      "betweenness": 0.143657,
+      "eigenvector": 0.317189,
+      "pagerank": 0.062767
+    },
+    {
+      "id": 3,
+      "community": 0,
+      "club": "Mr. Hi",
+      "degree": 6,
+      "x": -0.216657,
+      "y": 0.314033,
+      "degreeCentrality": 0.181818,
+      "betweenness": 0.011909,
+      "eigenvector": 0.211174,
+      "pagerank": 0.037212
+    },
+    {
+      "id": 4,
+      "community": 1,
+      "club": "Mr. Hi",
+      "degree": 3,
+      "x": 0.191619,
+      "y": 0.596383,
+      "degreeCentrality": 0.090909,
+      "betweenness": 0.000631,
+      "eigenvector": 0.075966,
+      "pagerank": 0.020504
+    },
+    {
+      "id": 5,
+      "community": 1,
+      "club": "Mr. Hi",
+      "degree": 4,
+      "x": 0.216557,
+      "y": 0.742581,
+      "degreeCentrality": 0.121212,
+      "betweenness": 0.029987,
+      "eigenvector": 0.079481,
+      "pagerank": 0.03381
+    },
+    {
+      "id": 6,
+      "community": 1,
+      "club": "Mr. Hi",
+      "degree": 4,
+      "x": 0.120327,
+      "y": 0.76589,
+      "degreeCentrality": 0.121212,
+      "betweenness": 0.029987,
+      "eigenvector": 0.079481,
+      "pagerank": 0.031529
+    },
+    {
+      "id": 7,
+      "community": 0,
+      "club": "Mr. Hi",
+      "degree": 4,
+      "x": -0.231286,
+      "y": 0.20101,
+      "degreeCentrality": 0.121212,
+      "betweenness": 0.0,
+      "eigenvector": 0.170955,
+      "pagerank": 0.026465
+    },
+    {
+      "id": 8,
+      "community": 3,
+      "club": "Mr. Hi",
+      "degree": 5,
+      "x": -0.069541,
+      "y": -0.110263,
+      "degreeCentrality": 0.151515,
+      "betweenness": 0.055927,
+      "eigenvector": 0.227405,
+      "pagerank": 0.033382
+    },
+    {
+      "id": 9,
+      "community": 3,
+      "club": "Officer",
+      "degree": 2,
+      "x": -0.216405,
+      "y": -0.488791,
+      "degreeCentrality": 0.060606,
+      "betweenness": 0.000848,
+      "eigenvector": 0.102675,
+      "pagerank": 0.009463
+    },
+    {
+      "id": 10,
+      "community": 1,
+      "club": "Mr. Hi",
+      "degree": 3,
+      "x": 0.327754,
+      "y": 0.627728,
+      "degreeCentrality": 0.090909,
+      "betweenness": 0.000631,
+      "eigenvector": 0.075966,
+      "pagerank": 0.020689
+    },
+    {
+      "id": 11,
+      "community": 1,
+      "club": "Mr. Hi",
+      "degree": 1,
+      "x": -0.385644,
+      "y": 0.394094,
+      "degreeCentrality": 0.030303,
+      "betweenness": 0.0,
+      "eigenvector": 0.052854,
+      "pagerank": 0.009786
+    },
+    {
+      "id": 12,
+      "community": 0,
+      "club": "Mr. Hi",
+      "degree": 2,
+      "x": -0.402125,
+      "y": 0.567017,
+      "degreeCentrality": 0.060606,
+      "betweenness": 0.0,
+      "eigenvector": 0.084252,
+      "pagerank": 0.011475
+    },
+    {
+      "id": 13,
+      "community": 0,
+      "club": "Mr. Hi",
+      "degree": 5,
+      "x": -0.121124,
+      "y": 0.08634,
+      "degreeCentrality": 0.151515,
+      "betweenness": 0.045863,
+      "eigenvector": 0.22647,
+      "pagerank": 0.033474
+    },
+    {
+      "id": 14,
+      "community": 3,
+      "club": "Officer",
+      "degree": 2,
+      "x": -0.056631,
+      "y": -0.710662,
+      "degreeCentrality": 0.060606,
+      "betweenness": 0.0,
+      "eigenvector": 0.101406,
+      "pagerank": 0.012942
+    },
+    {
+      "id": 15,
+      "community": 3,
+      "club": "Officer",
+      "degree": 2,
+      "x": 0.017041,
+      "y": -0.618143,
+      "degreeCentrality": 0.060606,
+      "betweenness": 0.0,
+      "eigenvector": 0.101406,
+      "pagerank": 0.016376
+    },
+    {
+      "id": 16,
+      "community": 1,
+      "club": "Mr. Hi",
+      "degree": 2,
+      "x": 0.262848,
+      "y": 1.0,
+      "degreeCentrality": 0.060606,
+      "betweenness": 0.0,
+      "eigenvector": 0.023635,
+      "pagerank": 0.016755
+    },
+    {
+      "id": 17,
+      "community": 1,
+      "club": "Mr. Hi",
+      "degree": 2,
+      "x": -0.124979,
+      "y": 0.675058,
+      "degreeCentrality": 0.060606,
+      "betweenness": 0.0,
+      "eigenvector": 0.092397,
+      "pagerank": 0.009677
+    },
+    {
+      "id": 18,
+      "community": 3,
+      "club": "Officer",
+      "degree": 2,
+      "x": -0.210169,
+      "y": -0.748216,
+      "degreeCentrality": 0.060606,
+      "betweenness": 0.0,
+      "eigenvector": 0.101406,
+      "pagerank": 0.009545
+    },
+    {
+      "id": 19,
+      "community": 1,
+      "club": "Mr. Hi",
+      "degree": 3,
+      "x": 0.15415,
+      "y": 0.168821,
+      "degreeCentrality": 0.090909,
+      "betweenness": 0.032475,
+      "eigenvector": 0.147911,
+      "pagerank": 0.013078
+    },
+    {
+      "id": 20,
+      "community": 3,
+      "club": "Officer",
+      "degree": 2,
+      "x": -0.330071,
+      "y": -0.611775,
+      "degreeCentrality": 0.060606,
+      "betweenness": 0.0,
+      "eigenvector": 0.101406,
+      "pagerank": 0.011224
+    },
+    {
+      "id": 21,
+      "community": 1,
+      "club": "Mr. Hi",
+      "degree": 2,
+      "x": -0.188226,
+      "y": 0.543486,
+      "degreeCentrality": 0.060606,
+      "betweenness": 0.0,
+      "eigenvector": 0.092397,
+      "pagerank": 0.01136
+    },
+    {
+      "id": 22,
+      "community": 3,
+      "club": "Officer",
+      "degree": 2,
+      "x": -0.332463,
+      "y": -0.354755,
+      "degreeCentrality": 0.060606,
+      "betweenness": 0.0,
+      "eigenvector": 0.101406,
+      "pagerank": 0.012961
+    },
+    {
+      "id": 23,
+      "community": 3,
+      "club": "Officer",
+      "degree": 5,
+      "x": 0.182182,
+      "y": -0.493275,
+      "degreeCentrality": 0.151515,
+      "betweenness": 0.017614,
+      "eigenvector": 0.150123,
+      "pagerank": 0.041146
+    },
+    {
+      "id": 24,
+      "community": 2,
+      "club": "Officer",
+      "degree": 3,
+      "x": 0.53258,
+      "y": -0.394817,
+      "degreeCentrality": 0.090909,
+      "betweenness": 0.00221,
+      "eigenvector": 0.057054,
+      "pagerank": 0.016634
+    },
+    {
+      "id": 25,
+      "community": 2,
+      "club": "Officer",
+      "degree": 3,
+      "x": 0.375016,
+      "y": -0.435068,
+      "degreeCentrality": 0.090909,
+      "betweenness": 0.00384,
+      "eigenvector": 0.059208,
+      "pagerank": 0.028673
+    },
+    {
+      "id": 26,
+      "community": 3,
+      "club": "Officer",
+      "degree": 2,
+      "x": 0.233083,
+      "y": -0.151765,
+      "degreeCentrality": 0.060606,
+      "betweenness": 0.0,
+      "eigenvector": 0.075582,
+      "pagerank": 0.01524
+    },
+    {
+      "id": 27,
+      "community": 3,
+      "club": "Officer",
+      "degree": 4,
+      "x": 0.267077,
+      "y": -0.328704,
+      "degreeCentrality": 0.121212,
+      "betweenness": 0.022333,
+      "eigenvector": 0.133479,
+      "pagerank": 0.027235
+    },
+    {
+      "id": 28,
+      "community": 2,
+      "club": "Officer",
+      "degree": 3,
+      "x": 0.066157,
+      "y": -0.294472,
+      "degreeCentrality": 0.090909,
+      "betweenness": 0.001795,
+      "eigenvector": 0.131079,
+      "pagerank": 0.014479
+    },
+    {
+      "id": 29,
+      "community": 3,
+      "club": "Officer",
+      "degree": 4,
+      "x": 0.158356,
+      "y": -0.367625,
+      "degreeCentrality": 0.121212,
+      "betweenness": 0.002922,
+      "eigenvector": 0.134965,
+      "pagerank": 0.028272
+    },
+    {
+      "id": 30,
+      "community": 3,
+      "club": "Officer",
+      "degree": 4,
+      "x": -0.194124,
+      "y": -0.177823,
+      "degreeCentrality": 0.121212,
+      "betweenness": 0.014412,
+      "eigenvector": 0.17476,
+      "pagerank": 0.023032
+    },
+    {
+      "id": 31,
+      "community": 2,
+      "club": "Officer",
+      "degree": 6,
+      "x": 0.204389,
+      "y": -0.241511,
+      "degreeCentrality": 0.181818,
+      "betweenness": 0.138276,
+      "eigenvector": 0.191036,
+      "pagerank": 0.041985
+    },
+    {
+      "id": 32,
+      "community": 3,
+      "club": "Officer",
+      "degree": 12,
+      "x": -0.050755,
+      "y": -0.414598,
+      "degreeCentrality": 0.363636,
+      "betweenness": 0.145247,
+      "eigenvector": 0.308651,
+      "pagerank": 0.075926
+    },
+    {
+      "id": 33,
+      "community": 3,
+      "club": "Officer",
+      "degree": 17,
+      "x": -0.021609,
+      "y": -0.341565,
+      "degreeCentrality": 0.515152,
+      "betweenness": 0.304075,
+      "eigenvector": 0.373371,
+      "pagerank": 0.09698
+    }
+  ],
+  "edges": [
+    {
+      "source": 0,
+      "target": 1
+    },
+    {
+      "source": 0,
+      "target": 2
+    },
+    {
+      "source": 0,
+      "target": 3
+    },
+    {
+      "source": 0,
+      "target": 4
+    },
+    {
+      "source": 0,
+      "target": 5
+    },
+    {
+      "source": 0,
+      "target": 6
+    },
+    {
+      "source": 0,
+      "target": 7
+    },
+    {
+      "source": 0,
+      "target": 8
+    },
+    {
+      "source": 0,
+      "target": 10
+    },
+    {
+      "source": 0,
+      "target": 11
+    },
+    {
+      "source": 0,
+      "target": 12
+    },
+    {
+      "source": 0,
+      "target": 13
+    },
+    {
+      "source": 0,
+      "target": 17
+    },
+    {
+      "source": 0,
+      "target": 19
+    },
+    {
+      "source": 0,
+      "target": 21
+    },
+    {
+      "source": 0,
+      "target": 31
+    },
+    {
+      "source": 1,
+      "target": 2
+    },
+    {
+      "source": 1,
+      "target": 3
+    },
+    {
+      "source": 1,
+      "target": 7
+    },
+    {
+      "source": 1,
+      "target": 13
+    },
+    {
+      "source": 1,
+      "target": 17
+    },
+    {
+      "source": 1,
+      "target": 19
+    },
+    {
+      "source": 1,
+      "target": 21
+    },
+    {
+      "source": 1,
+      "target": 30
+    },
+    {
+      "source": 2,
+      "target": 3
+    },
+    {
+      "source": 2,
+      "target": 7
+    },
+    {
+      "source": 2,
+      "target": 8
+    },
+    {
+      "source": 2,
+      "target": 9
+    },
+    {
+      "source": 2,
+      "target": 13
+    },
+    {
+      "source": 2,
+      "target": 27
+    },
+    {
+      "source": 2,
+      "target": 28
+    },
+    {
+      "source": 2,
+      "target": 32
+    },
+    {
+      "source": 3,
+      "target": 7
+    },
+    {
+      "source": 3,
+      "target": 12
+    },
+    {
+      "source": 3,
+      "target": 13
+    },
+    {
+      "source": 4,
+      "target": 6
+    },
+    {
+      "source": 4,
+      "target": 10
+    },
+    {
+      "source": 5,
+      "target": 6
+    },
+    {
+      "source": 5,
+      "target": 10
+    },
+    {
+      "source": 5,
+      "target": 16
+    },
+    {
+      "source": 6,
+      "target": 16
+    },
+    {
+      "source": 8,
+      "target": 30
+    },
+    {
+      "source": 8,
+      "target": 32
+    },
+    {
+      "source": 8,
+      "target": 33
+    },
+    {
+      "source": 9,
+      "target": 33
+    },
+    {
+      "source": 13,
+      "target": 33
+    },
+    {
+      "source": 14,
+      "target": 32
+    },
+    {
+      "source": 14,
+      "target": 33
+    },
+    {
+      "source": 15,
+      "target": 32
+    },
+    {
+      "source": 15,
+      "target": 33
+    },
+    {
+      "source": 18,
+      "target": 32
+    },
+    {
+      "source": 18,
+      "target": 33
+    },
+    {
+      "source": 19,
+      "target": 33
+    },
+    {
+      "source": 20,
+      "target": 32
+    },
+    {
+      "source": 20,
+      "target": 33
+    },
+    {
+      "source": 22,
+      "target": 32
+    },
+    {
+      "source": 22,
+      "target": 33
+    },
+    {
+      "source": 23,
+      "target": 25
+    },
+    {
+      "source": 23,
+      "target": 27
+    },
+    {
+      "source": 23,
+      "target": 29
+    },
+    {
+      "source": 23,
+      "target": 32
+    },
+    {
+      "source": 23,
+      "target": 33
+    },
+    {
+      "source": 24,
+      "target": 25
+    },
+    {
+      "source": 24,
+      "target": 27
+    },
+    {
+      "source": 24,
+      "target": 31
+    },
+    {
+      "source": 25,
+      "target": 31
+    },
+    {
+      "source": 26,
+      "target": 29
+    },
+    {
+      "source": 26,
+      "target": 33
+    },
+    {
+      "source": 27,
+      "target": 33
+    },
+    {
+      "source": 28,
+      "target": 31
+    },
+    {
+      "source": 28,
+      "target": 33
+    },
+    {
+      "source": 29,
+      "target": 32
+    },
+    {
+      "source": 29,
+      "target": 33
+    },
+    {
+      "source": 30,
+      "target": 32
+    },
+    {
+      "source": 30,
+      "target": 33
+    },
+    {
+      "source": 31,
+      "target": 32
+    },
+    {
+      "source": 31,
+      "target": 33
+    },
+    {
+      "source": 32,
+      "target": 33
+    }
+  ],
+  "topInfluencers": [
+    {
+      "node": 33,
+      "degree": 0.515152,
+      "betweenness": 0.304075,
+      "eigenvector": 0.373371,
+      "pagerank": 0.09698
+    },
+    {
+      "node": 0,
+      "degree": 0.484848,
+      "betweenness": 0.437635,
+      "eigenvector": 0.355483,
+      "pagerank": 0.088508
+    },
+    {
+      "node": 32,
+      "degree": 0.363636,
+      "betweenness": 0.145247,
+      "eigenvector": 0.308651,
+      "pagerank": 0.075926
+    },
+    {
+      "node": 2,
+      "degree": 0.30303,
+      "betweenness": 0.143657,
+      "eigenvector": 0.317189,
+      "pagerank": 0.062767
+    },
+    {
+      "node": 1,
+      "degree": 0.272727,
+      "betweenness": 0.053937,
+      "eigenvector": 0.265954,
+      "pagerank": 0.057415
+    },
+    {
+      "node": 31,
+      "degree": 0.181818,
+      "betweenness": 0.138276,
+      "eigenvector": 0.191036,
+      "pagerank": 0.041985
+    },
+    {
+      "node": 23,
+      "degree": 0.151515,
+      "betweenness": 0.017614,
+      "eigenvector": 0.150123,
+      "pagerank": 0.041146
+    },
+    {
+      "node": 3,
+      "degree": 0.181818,
+      "betweenness": 0.011909,
+      "eigenvector": 0.211174,
+      "pagerank": 0.037212
+    }
+  ]
+}
