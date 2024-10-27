@@ -1,1 +1,1 @@
-"""NetDetect social network analysis and influence propagation toolkit."""
+"""Network Analysis Toolkit package."""

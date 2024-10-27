@@ -1,35 +1,61 @@
 # Network Analysis Toolkit
 
-This project explores social network structure with community detection, centrality, influence spread, and link prediction.
+Network Analysis Toolkit is a Python project for exploring how structure shapes behaviour in social networks. It builds benchmark graphs, detects communities, ranks influential nodes, simulates information spread, and evaluates link prediction methods.
 
-It includes a command-line pipeline, a notebook walkthrough, reusable modules, and generated plots from synthetic and small benchmark-style graphs.
+The project is designed as a compact analytics pipeline rather than a one-off notebook. It includes reusable modules, a command-line workflow, a notebook walkthrough, generated figures, tests, and GitHub Actions CI.
 
 <p align="center">
   <img src="outputs/network_communities.png" width="700" alt="Community structure visualisation">
 </p>
 
-## What is included
+## What This Demonstrates
 
-- Graph generation for SBM, LFR, and small named datasets
-- Community detection with Louvain, label propagation, Girvan-Newman, and spectral clustering
-- Centrality analysis with degree, betweenness, eigenvector, and PageRank
-- Independent Cascade influence simulations
-- Link prediction with heuristics and gradient boosting
-- Plotting utilities for distributions, comparisons, and communities
+- Graph modelling with NetworkX
+- Community detection and benchmark evaluation
+- Centrality analysis for influence ranking
+- Independent Cascade simulations
+- Static link recovery with heuristic and supervised models
+- Reproducible command-line analysis
+- Automated tests and public repo hygiene
 
-## Key outputs
+## Pipeline
 
-| Area | Output |
+| Step | Output |
 | --- | --- |
-| Community detection | Modularity and NMI comparisons |
-| Centrality | Correlation and distribution plots |
-| Influence spread | Seed strategy comparison |
-| Link prediction | Heuristic and ML baseline metrics |
+| Build graph | SBM, LFR, or Zachary's Karate Club network |
+| Detect communities | Modularity, NMI, ARI, and community counts |
+| Rank nodes | Degree, betweenness, eigenvector centrality, and PageRank |
+| Simulate spread | Mean reach by seed-selection strategy |
+| Predict links | Held-out AUC and average precision |
+| Export figures | Community, distribution, influence, and feature importance plots |
 
-## Quick start
+## Sample Results
+
+These results come from a local smoke test using:
 
 ```bash
-pip install -r requirements.txt
+python main.py --dataset karate --output outputs_public_check
+```
+
+| Area | Example result |
+| --- | --- |
+| Best community modularity | Louvain, 0.4266 |
+| Highest NMI | Girvan-Newman, 0.7324 |
+| Top PageRank node | Node 33 |
+| Best heuristic link predictor | Preferential Attachment, AUC 0.7882 |
+| Supervised holdout result | Gradient Boosting, AUC 0.6181 |
+
+Link prediction is evaluated as a static edge recovery benchmark. It does not claim to forecast future behaviour from time-series data.
+
+## Quick Start
+
+Python 3.10 or newer is recommended.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
 python main.py --dataset sbm --nodes 300
 ```
 
@@ -38,6 +64,20 @@ Other examples:
 ```bash
 python main.py --dataset lfr --nodes 500
 python main.py --dataset karate
+python main.py --dataset sbm --nodes 300 --seed 7 --test-fraction 0.2
+```
+
+## Command-Line Options
+
+```text
+--dataset             Choose sbm, lfr, or karate
+--nodes               Number of nodes for synthetic datasets
+--output              Directory for generated figures
+--seed                Random seed for reproducible runs
+--test-fraction       Fraction of edges held out for link prediction
+--propagation-prob    Per-edge activation probability for spread simulation
+--seed-size           Number of initial seed nodes
+--simulations         Number of influence simulations per strategy
 ```
 
 ## Tests
@@ -46,7 +86,9 @@ python main.py --dataset karate
 pytest
 ```
 
-## Repository map
+The GitHub Actions workflow runs the same test suite on every push and pull request.
+
+## Repository Map
 
 ```text
 main.py                         End-to-end CLI pipeline
@@ -56,10 +98,11 @@ src/influence_analysis.py       Centrality and spread simulation
 src/link_prediction.py          Link prediction features and models
 src/visualisation.py            Plot generation
 notebooks/analysis.ipynb        Interactive walkthrough
+tests/test_pipeline.py          Regression and smoke tests
 outputs/                        Generated figures
 ```
 
-## Sample figures
+## Sample Figures
 
 <p align="center">
   <img src="outputs/detection_comparison.png" width="700" alt="Algorithm comparison">

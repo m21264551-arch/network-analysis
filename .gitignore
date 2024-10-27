@@ -9,6 +9,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ipynb_checkpoints/
+*.egg-info/
 node_modules/
 .venv/
 venv/
@@ -25,3 +26,4 @@ key.properties
 *.pickle
 *.parquet
 *.zip
+outputs_*/

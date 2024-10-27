@@ -1,5 +1,5 @@
 """
-End-to-end NetDetect pipeline.
+End-to-end Network Analysis Toolkit pipeline.
 
 Runs graph construction, community detection, centrality analysis, influence
 propagation, link prediction, and plot generation.
@@ -10,14 +10,11 @@ Usage
 """
 
 import argparse
-import sys
 from pathlib import Path
 
 import matplotlib
 
 matplotlib.use("Agg")
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from src.community_detection import run_all_detectors
 from src.influence_analysis import compare_seed_strategies, compute_centralities
@@ -43,18 +40,27 @@ from src.visualisation import (
 )
 
 
-def main(dataset: str = "sbm", n_nodes: int = 300, output_dir: str = "outputs"):
+def main(
+    dataset: str = "sbm",
+    n_nodes: int = 300,
+    output_dir: str = "outputs",
+    seed: int = 42,
+    test_fraction: float = 0.15,
+    propagation_prob: float = 0.1,
+    seed_size: int = 5,
+    simulations: int = 100,
+):
     """Run the full analysis pipeline and return the main result objects."""
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
     print("=" * 60)
-    print("  NetDetect Social Network Analysis Pipeline")
+    print("  Network Analysis Toolkit Pipeline")
     print("=" * 60)
 
     node_label = f", n={n_nodes}" if dataset != "karate" else ""
     print(f"\n[1/6] Building network ({dataset}{node_label})...")
-    G = _build_graph(dataset, n_nodes)
+    G = _build_graph(dataset, n_nodes, seed)
 
     summary = get_network_summary(G)
     for key, value in summary.items():
@@ -106,8 +112,9 @@ def main(dataset: str = "sbm", n_nodes: int = 300, output_dir: str = "outputs"):
     comparison = compare_seed_strategies(
         G,
         centrality_df,
-        seed_size=5,
-        propagation_prob=0.1,
+        seed_size=seed_size,
+        propagation_prob=propagation_prob,
+        num_simulations=simulations,
     )
     print(comparison.to_string(index=False))
 
@@ -115,7 +122,11 @@ def main(dataset: str = "sbm", n_nodes: int = 300, output_dir: str = "outputs"):
     print("  [ok] Influence plot saved")
 
     print("\n[5/6] Running link prediction experiments...")
-    G_train, test_pos, test_neg = train_test_split_edges(G, test_fraction=0.15)
+    G_train, test_pos, test_neg = train_test_split_edges(
+        G,
+        test_fraction=test_fraction,
+        seed=seed,
+    )
     print(
         f"  Train edges: {G_train.number_of_edges()}  |  "
         f"Test +: {len(test_pos)}  |  Test -: {len(test_neg)}"
@@ -125,7 +136,7 @@ def main(dataset: str = "sbm", n_nodes: int = 300, output_dir: str = "outputs"):
     print("\n  Heuristic methods:")
     print(heuristic_results.to_string(index=False))
 
-    ml_results = train_link_predictor(G_train, test_pos, test_neg)
+    ml_results = train_link_predictor(G_train, test_pos, test_neg, seed=seed)
     cv_mean = ml_results["cv_mean_auc"]
     cv_std = ml_results["cv_std_auc"]
     cv_text = "not available" if cv_mean is None else f"{cv_mean:.4f} +/- {cv_std:.4f}"
@@ -156,16 +167,17 @@ def main(dataset: str = "sbm", n_nodes: int = 300, output_dir: str = "outputs"):
     }
 
 
-def _build_graph(dataset: str, n_nodes: int):
+def _build_graph(dataset: str, n_nodes: int, seed: int = 42):
     """Build a graph for the selected dataset."""
     if dataset == "sbm":
         return generate_stochastic_block_model(
             sizes=_balanced_community_sizes(n_nodes, 5),
             p_intra=0.25,
             p_inter=0.01,
+            seed=seed,
         )
     if dataset == "lfr":
-        return generate_lfr_benchmark(n=n_nodes)
+        return generate_lfr_benchmark(n=n_nodes, seed=seed)
     if dataset == "karate":
         return load_karate_club()
     raise ValueError(f"Unknown dataset: {dataset}")
@@ -196,12 +208,31 @@ def _community_count_for_detection(G) -> int:
     return min(3, G.number_of_nodes())
 
 
-if __name__ == "__main__":
+def cli():
+    """Parse command-line arguments and run the pipeline."""
     parser = argparse.ArgumentParser(
-        description="NetDetect Social Network Analysis Pipeline",
+        description="Network Analysis Toolkit pipeline",
     )
     parser.add_argument("--dataset", choices=["sbm", "lfr", "karate"], default="sbm")
     parser.add_argument("--nodes", type=int, default=300)
     parser.add_argument("--output", type=str, default="outputs")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--test-fraction", type=float, default=0.15)
+    parser.add_argument("--propagation-prob", type=float, default=0.1)
+    parser.add_argument("--seed-size", type=int, default=5)
+    parser.add_argument("--simulations", type=int, default=100)
     args = parser.parse_args()
-    main(dataset=args.dataset, n_nodes=args.nodes, output_dir=args.output)
+    main(
+        dataset=args.dataset,
+        n_nodes=args.nodes,
+        output_dir=args.output,
+        seed=args.seed,
+        test_fraction=args.test_fraction,
+        propagation_prob=args.propagation_prob,
+        seed_size=args.seed_size,
+        simulations=args.simulations,
+    )
+
+
+if __name__ == "__main__":
+    cli()
