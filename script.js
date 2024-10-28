@@ -615,6 +615,7 @@ Promise.all([
   })
   .catch(() => {
     networkExplorer.classList.add("is-hidden");
+    mainImage.src = mainImage.dataset.fallbackSrc;
     mainImage.classList.remove("is-hidden");
     renderView("communities");
   });
