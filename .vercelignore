@@ -1,8 +1,7 @@
 *
+!*/
 !index.html
 !styles.css
 !script.js
-!data/
 !data/**
-!outputs/
 !outputs/network_communities.png
