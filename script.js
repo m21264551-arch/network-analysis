@@ -11,8 +11,8 @@ const views = {
       ["Modularity", "0.4266"],
     ],
     copy:
-      "This is not just a screenshot: the graph is exported from the Python pipeline as JSON and rendered client-side with hover, filtering, and centrality-based node sizing.",
-    note: "Data source: data/network-karate.json",
+      "Graph data: JSON export with hover, filtering, and centrality-based node sizing.",
+    note: "Source: data/network-karate.json",
     download: "data/network-karate.json",
   },
   communities: {
@@ -28,8 +28,8 @@ const views = {
       ["Best method", "Louvain"],
     ],
     copy:
-      "The dashboard separates quality measures so a reviewer can see both structure strength and agreement with available ground-truth labels.",
-    note: "Run all detectors with src.community_detection.run_all_detectors",
+      "Compare modularity, NMI, and community count across detection algorithms.",
+    note: "Output: detector comparison",
     download: "data/dashboard-metrics.json",
   },
   influence: {
@@ -45,8 +45,8 @@ const views = {
       ["Output", "Mean reach"],
     ],
     copy:
-      "Independent Cascade simulations compare practical seed-selection strategies, making influence results easier to explain than a raw centrality table.",
-    note: "Compare strategies with src.influence_analysis.compare_seed_strategies",
+      "Compare seed strategies by mean activated reach.",
+    note: "Output: influence spread",
     download: "data/dashboard-metrics.json",
   },
   links: {
@@ -62,7 +62,7 @@ const views = {
       ["Held-out negatives", "12"],
     ],
     copy:
-      "Classical link-prediction heuristics are scored on removed real edges and balanced sampled non-edges, so the benchmark tests whether a method ranks missing links ahead of false candidates.",
+      "Compare AUC and average precision on held-out edges.",
     note: "Best heuristic: Preferential Attachment, AUC 0.7882",
     download: "data/dashboard-metrics.json",
   },
@@ -79,8 +79,8 @@ const views = {
       ["Tests", "pytest"],
     ],
     copy:
-      "The repo is organised as a compact analytics product: reusable source modules, a command-line pipeline, a notebook walkthrough, generated figures, and regression tests.",
-    note: "Install locally with python -m pip install -e .[dev]",
+      "Source modules, CLI, notebook, generated figures, and tests.",
+    note: "Run: python main.py",
     download: "data/dashboard-metrics.json",
   },
 };
@@ -216,13 +216,15 @@ function renderChart(container, key, large = false) {
   }
 }
 
-function chartSvg({ width = 520, height = 260, large = false } = {}) {
+function chartSvg({ width, height, large = false } = {}) {
+  const chartWidth = width ?? (large ? 680 : 520);
+  const chartHeight = height ?? (large ? 520 : 260);
   const svgEl = createSvg("svg", {
     class: `chart-svg${large ? " is-large" : ""}`,
-    viewBox: `0 0 ${width} ${height}`,
+    viewBox: `0 0 ${chartWidth} ${chartHeight}`,
     role: "img",
   });
-  return { svgEl, width, height };
+  return { svgEl, width: chartWidth, height: chartHeight };
 }
 
 function renderGroupedBars(rows, labelKey, series, large = false) {
