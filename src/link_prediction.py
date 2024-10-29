@@ -12,10 +12,10 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import average_precision_score, roc_auc_score
-from sklearn.model_selection import StratifiedKFold
 
 
 # Train and test split
+
 
 def train_test_split_edges(
     G: nx.Graph,
@@ -45,7 +45,9 @@ def train_test_split_edges(
     rng.shuffle(edges)
     rng.shuffle(non_edges)
 
-    target_test_count = min(max(1, int(round(len(edges) * test_fraction))), len(non_edges))
+    target_test_count = min(
+        max(1, int(round(len(edges) * test_fraction))), len(non_edges)
+    )
     original_components = nx.number_connected_components(G)
     G_train = G.copy()
     test_edges = []
@@ -53,11 +55,12 @@ def train_test_split_edges(
     for u, v in edges:
         if len(test_edges) >= target_test_count:
             break
+        edge_data = dict(G_train.edges[u, v])
         G_train.remove_edge(u, v)
         if nx.number_connected_components(G_train) == original_components:
             test_edges.append((u, v))
         else:
-            G_train.add_edge(u, v)
+            G_train.add_edge(u, v, **edge_data)
 
     if not test_edges:
         raise ValueError("could not hold out any edges without changing connectivity")
@@ -67,6 +70,7 @@ def train_test_split_edges(
 
 
 # Heuristic predictors
+
 
 def evaluate_heuristics(
     G_train: nx.Graph,
@@ -112,10 +116,10 @@ def evaluate_heuristics(
 FEATURE_NAMES = [
     "common_neighbors",
     "pref_attachment",
-    "degree_u",
-    "degree_v",
-    "clustering_u",
-    "clustering_v",
+    "degree_min",
+    "degree_max",
+    "clustering_min",
+    "clustering_max",
     "shortest_path",
 ]
 
@@ -178,7 +182,9 @@ def train_link_predictor(
         random_state=seed,
     )
 
-    cv_auc = _cross_validated_auc(clf, X_train, y_train, seed)
+    # Validation occurs by rebuilding the graph for each exported outer split.
+    # Row-wise CV of precomputed topology features is deliberately not reported.
+    cv_auc = []
     clf.fit(X_train, y_train)
     test_probs = clf.predict_proba(X_test)[:, 1]
 
@@ -225,10 +231,10 @@ def _pair_features(G: nx.Graph, u: int, v: int) -> list:
     return [
         common_neighbors,
         pref_attachment,
-        u_degree,
-        v_degree,
-        u_clustering,
-        v_clustering,
+        min(u_degree, v_degree),
+        max(u_degree, v_degree),
+        min(u_clustering, v_clustering),
+        max(u_clustering, v_clustering),
         shortest_path,
     ]
 
@@ -246,34 +252,9 @@ def _sample_negative_edges(
 ) -> list:
     """Sample non-edges while respecting an exclusion list."""
     excluded = {_edge_key(u, v) for u, v in excluded_edges}
-    candidates = [
-        (u, v)
-        for u, v in nx.non_edges(G)
-        if _edge_key(u, v) not in excluded
-    ]
+    candidates = [(u, v) for u, v in nx.non_edges(G) if _edge_key(u, v) not in excluded]
     rng.shuffle(candidates)
     return candidates[:count]
-
-
-def _cross_validated_auc(
-    clf: GradientBoostingClassifier,
-    X: np.ndarray,
-    y: np.ndarray,
-    seed: int,
-) -> list:
-    """Run stratified cross-validation when each class has enough samples."""
-    class_counts = np.bincount(y)
-    n_splits = min(5, int(class_counts.min()))
-    if n_splits < 2:
-        return []
-
-    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
-    auc_scores = []
-    for train_idx, val_idx in cv.split(X, y):
-        clf.fit(X[train_idx], y[train_idx])
-        probs = clf.predict_proba(X[val_idx])[:, 1]
-        auc_scores.append(roc_auc_score(y[val_idx], probs))
-    return auc_scores
 
 
 def _validate_test_edges(test_edges: list, test_non_edges: list) -> None:

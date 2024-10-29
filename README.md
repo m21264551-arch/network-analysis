@@ -1,124 +1,71 @@
-# Network Analysis Toolkit
+# Network Structure Explorer
 
-Network Analysis Toolkit is a Python project for exploring how structure shapes behaviour in social networks. It builds benchmark graphs, detects communities, ranks influential nodes, simulates information spread, and evaluates link prediction methods.
+**How do community structure and node position affect influence and missing-link recovery?**
 
-The project is designed as a compact analytics pipeline rather than a one-off notebook. It includes reusable modules, a command-line workflow, a notebook walkthrough, generated figures, tests, and GitHub Actions CI.
+[Open the explorer](https://network.m21264551.com) · [Case study](docs/case-study.md)
 
-<p align="center">
-  <img src="outputs/network_communities.png" width="700" alt="Community structure visualisation">
-</p>
+![Graph-first experiment](outputs/explorer-desktop.png)
 
-## What This Demonstrates
+## Walkthrough
 
-- Graph modelling with NetworkX
-- Community detection and benchmark evaluation
-- Centrality analysis for influence ranking
-- Independent Cascade simulations
-- Static link recovery with heuristic and supervised models
-- Reproducible command-line analysis
-- Automated tests and public repo hygiene
+1. Compare the observed Karate Club split with four community algorithms.
+2. Switch to strong or weak planted groups and inspect where agreement breaks down.
+3. Compare seed strategies across paired propagation trials. Step through a saved cascade.
+4. Examine missing-link recovery across 20 outer splits, including cases where a learned model loses.
 
-## Pipeline
+Every count, partition, metric, summary, replay and download comes from `data/experiments.json` (schema v1). Browser controls select bounded precomputed experiments; no analysis server is required. Keyboard node selection and persistent details accompany the graph.
 
-| Step | Output |
-| --- | --- |
-| Build graph | SBM, LFR, or Zachary's Karate Club network |
-| Detect communities | Modularity, NMI, ARI, and community counts |
-| Rank nodes | Degree, betweenness, eigenvector centrality, and PageRank |
-| Simulate spread | Mean reach by seed-selection strategy |
-| Predict links | Held-out AUC and average precision |
-| Export figures | Community, distribution, influence, and feature importance plots |
+## Data and protocol
 
-## Sample Results
+- **Karate Club:** NetworkX's copy of Zachary's 34-person, 78-edge network. Reference labels describe the subsequent club split, not a unique correct partition. [Source and citation](https://networkx.org/documentation/stable/reference/generated/networkx.generators.social.karate_club_graph.html).
+- **Strong SBM:** four groups of 20, within-group probability 0.30, between-group probability 0.015.
+- **Weak SBM:** four groups of 20, probabilities 0.18 and 0.08.
 
-These results come from a local smoke test using:
+Graphs are unweighted and undirected. Generation, layout and algorithm seeds are fixed and exported. Louvain and label propagation choose partitions; Girvan–Newman and spectral clustering receive the reference group count. Spectral clustering embeds the smallest non-trivial normalized-Laplacian eigenvectors then applies k-means. Modularity evaluates internal connectivity; NMI/adjusted Rand evaluate agreement with reference labels. They are not interchangeable.
 
-```bash
-python main.py --dataset karate --output outputs_public_check
-```
+Link recovery holds out approximately 15% of edges over seeds 0–19 while preserving connectivity. Negatives are balanced true non-edges from the original graph. Held-out pairs never enter training negatives. Features are recomputed on each split's remaining graph; a positive training pair's own edge is temporarily removed. Min/max endpoint features make undirected pairs invariant to endpoint order. The fixed gradient-boosting challenger uses 200 estimators, depth 3 and learning rate 0.05. There is no row-wise CV over cached topology features.
 
-| Area | Example result |
-| --- | --- |
-| Best community modularity | Louvain, 0.4266 |
-| Highest NMI | Girvan-Newman, 0.7324 |
-| Top PageRank node | Node 33 |
-| Best heuristic link predictor | Preferential Attachment, AUC 0.7882 |
-| Supervised holdout result | Gradient Boosting, AUC 0.6181 |
+Independent Cascade compares PageRank, degree, betweenness and one fixed random seed set. Each seed count (1/3/5) and propagation probability (0.05/0.1/0.2) has 100 paired directed live-edge worlds. Strategies see the same world within a trial. Reported spread variability is a standard deviation, not a confidence interval or observed human behaviour.
 
-Link prediction is evaluated as a static edge recovery benchmark. It does not claim to forecast future behaviour from time-series data.
+## Reproduced results
 
-## Quick Start
+Mean ROC-AUC across the 20 outer splits:
 
-Python 3.10 or newer is recommended.
+| Dataset | Highest mean | Gradient Boosting | Interpretation |
+|---|---|---|---|
+| Karate Club | Preferential Attachment 0.768 | 0.690 | The simple degree-product heuristic wins here. |
+| Strong SBM | Jaccard 0.751 | 0.716 | Local overlap contains a recoverable signal. |
+| Weak SBM | Jaccard 0.500 | 0.493 | None of these methods establishes useful recovery on this graph. |
 
-```bash
+The explorer reports standard deviations and every split, not just the means. These are repeated partitions of three fixed graphs, not independent population samples. Changing graph weights, algorithm information or split rules changes the question and can change the ranking.
+
+## Reproduce and verify
+
+Python 3.11 and Node 20:
+
+```sh
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-python main.py --dataset sbm --nodes 300
+pip install -r requirements-reproduce.txt
+pip install -e . --no-deps
+python main.py --export-dashboard data/experiments.json
+python -m pytest -q
+python -m http.server 8087
 ```
 
-Other examples:
+For browser checks in another terminal:
 
-```bash
-python main.py --dataset lfr --nodes 500
-python main.py --dataset karate
-python main.py --dataset sbm --nodes 300 --seed 7 --test-fraction 0.2
+```sh
+npm ci
+npx playwright install chromium
+npm run test:browser
+npm run build
 ```
 
-## Command-Line Options
+The existing analysis CLI and LFR generator remain available (`python main.py --help`). The export records code revision, source checksum, dataset checksums, seeds, parameters, graph coordinates, exact partitions, all split pairs, scores and diffusion reaches. Timestamps and code revisions differ between exports; the numerical experiments are deterministic in the pinned scientific environment.
 
-```text
---dataset             Choose sbm, lfr, or karate
---nodes               Number of nodes for synthetic datasets
---output              Directory for generated figures
---seed                Random seed for reproducible runs
---test-fraction       Fraction of edges held out for link prediction
---propagation-prob    Per-edge activation probability for spread simulation
---seed-size           Number of initial seed nodes
---simulations         Number of influence simulations per strategy
-```
+Tests cover generation determinism, graph/attribute preservation, valid negative sampling, absent held-out edges, symmetric features, paired cascades, export consistency and UI/download parity. Browser checks cover keyboard node inspection, relevant controls, missing-data recovery, mobile layout and axe accessibility. CI runs both suites.
 
-## Tests
+## Limits and tradeoffs
 
-```bash
-pytest
-```
-
-The GitHub Actions workflow runs the same test suite on every push and pull request.
-
-## Repository Map
-
-```text
-main.py                         End-to-end CLI pipeline
-src/network_builder.py          Graph construction
-src/community_detection.py      Community algorithms
-src/influence_analysis.py       Centrality and spread simulation
-src/link_prediction.py          Link prediction features and models
-src/visualisation.py            Plot generation
-notebooks/analysis.ipynb        Interactive walkthrough
-tests/test_pipeline.py          Regression and smoke tests
-outputs/                        Generated figures
-```
-
-## Sample Figures
-
-<p align="center">
-  <img src="outputs/detection_comparison.png" width="700" alt="Algorithm comparison">
-  <br><em>Community detection comparison</em>
-</p>
-
-<p align="center">
-  <img src="outputs/influence_comparison.png" width="600" alt="Influence strategies">
-  <br><em>Influence seed strategy comparison</em>
-</p>
-
-<p align="center">
-  <img src="outputs/link_pred_importances.png" width="600" alt="Link prediction feature importances">
-  <br><em>Link prediction feature importance</em>
-</p>
-
-## License
-
-MIT
+The static bundle makes publication auditable and browsing cheap. It deliberately limits visitors to curated experiments. Connectivity preservation excludes bridge edges from the link task; balanced negatives do not represent real missing-link prevalence. Training edges are locally removed for features, but a single static graph still differs from a temporal prediction task. The synthetic groups are planted by construction. More complex models or visually attractive partitions are not automatically better.
