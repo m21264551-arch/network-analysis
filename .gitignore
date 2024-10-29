@@ -30,3 +30,4 @@ outputs_*/
 node_modules/
 test-results/
 playwright-report/
+.vercel
