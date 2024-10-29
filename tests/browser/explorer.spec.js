@@ -72,3 +72,24 @@ for (const width of [1440, 390])
       ),
     ).toBe(true);
   });
+
+
+test("experiment controls wait for the artifact before accepting interaction", async ({ page }) => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/data/experiments.json", async (route) => {
+    await gate;
+    await route.continue();
+  });
+  await page.goto("/");
+  const links = page.getByRole("button", { name: "03 Missing links" });
+  await expect(links).toBeDisabled();
+  await links.evaluate((button) => button.click());
+  release();
+  await expect(links).toBeEnabled();
+  await links.click();
+  await expect(page.getByRole("cell", { name: "0.768", exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
