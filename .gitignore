@@ -27,3 +27,6 @@ key.properties
 *.parquet
 *.zip
 outputs_*/
+node_modules/
+test-results/
+playwright-report/
