@@ -61,6 +61,8 @@ test("missing artifact offers recovery without invented results", async ({
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   await expect(page.locator("#workspace")).toBeHidden();
+  await page.getByRole("link", {name:"How to use",exact:true}).click();
+  await expect(page.getByRole("heading", {name:"How to use Network Explorer",exact:true})).toBeVisible();
 });
 for (const width of [1440, 390])
   test(`accessible main journey at ${width}px`, async ({ page }) => {
@@ -99,4 +101,14 @@ test("experiment controls wait for the artifact before accepting interaction", a
     page.getByRole("cell", { name: "0.768", exact: true }),
   ).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("guide navigation keeps the current selection", async ({page})=>{
+  await page.goto("/?source=portfolio");
+  await page.getByRole("combobox",{name:"Select node",exact:true}).selectOption("33");
+  await page.getByRole("link",{name:"How to use",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"How to use Network Explorer",exact:true})).toBeVisible();
+  await page.getByRole("link",{name:"Back to tool ↑"}).click();
+  expect(new URL(page.url()).search).toBe("?source=portfolio");
+  await expect(page.getByRole("combobox",{name:"Select node",exact:true})).toHaveValue("33");
 });

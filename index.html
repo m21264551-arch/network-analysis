@@ -13,12 +13,13 @@
   <body>
     <header>
       <a href="/">Network Explorer</a>
-      <nav aria-label="External links">
+      <nav aria-label="Project links">
+        <a href="#how-to-use">How to use</a>
         <a href="https://github.com/m21264551-arch/network-analysis">Code ↗</a
         ><a href="https://m21264551.com">Portfolio ↗</a>
       </nav>
     </header>
-    <main>
+    <main id="tool" tabindex="-1">
       <h1>Explore communities, influence, and missing links.</h1>
       <div class="dataset">
         <label for="dataset">Dataset</label
@@ -45,6 +46,17 @@
         <a href="data/experiments.json">experiment JSON</a> is available without
         it.</noscript
       >
+<section id="how-to-use" class="learning-guide" aria-labelledby="guide-title" tabindex="-1">
+<h2 id="guide-title">How to use Network Explorer</h2>
+<p>A network records things and the connections between them. In Karate Club, each numbered node is a member and each line is a recorded friendship. The other two datasets are generated graphs with known groups, so you can compare how methods behave when those groups are easier or harder to separate.</p>
+<ol class="guide-steps">
+<li><h3>Inspect a member</h3><p>Select a numbered node, or use Select node. Its details show how many neighbours it has and different measures of importance. Change Size nodes by to see how those definitions emphasise different positions.</p></li>
+<li><h3>Change the groups</h3><p>Use Display groups to switch between the reference labels and a community method. Colours show membership in the selected partition. Compare the result below: modularity measures internal connection density, while NMI measures agreement with the reference groups.</p></li>
+<li><h3>Make the problem harder</h3><p>Switch from Strongly separated groups to Weakly separated groups. See whether the same method still recovers the known structure. A visually neat partition does not necessarily agree with those labels.</p></li>
+</ol>
+<p><strong>Explore further:</strong> Influence compares simulated spread from different seed nodes. Link recovery compares methods at finding connections deliberately removed from a graph. Its scores summarise repeated splits, not predictions about new friendships.</p>
+<p>These controls select saved experiments. Simulated influence follows a simple propagation rule; it does not establish how people actually behave.</p>
+<a href="#tool">Back to tool ↑</a></section>
       <footer id="provenance"></footer>
     </main>
     <script type="module" src="script.js"></script>
