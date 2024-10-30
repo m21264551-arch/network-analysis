@@ -18,6 +18,10 @@ let bundle,
   method = "Louvain",
   size = "pagerank",
   selected = 0,
+  reference = false,
+  highlight = false,
+  splitIndex = 0,
+  revealLinks = false,
   probability = 0.1,
   count = 3,
   strategy = "PageRank",
@@ -49,34 +53,59 @@ const options = (items, value) =>
         `<option ${String(x) === String(value) ? "selected" : ""}>${x}</option>`,
     )
     .join("");
-function graph(partition, active = null, seeds = []) {
-  const pos = (n) => ({ x: 55 + (n.x + 1) * 285, y: 35 + (n.y + 1) * 185 });
+function graph(partition, active = null, seeds = [], split = null) {
+  const width = Math.max(280, $("#workspace").clientWidth - (matchMedia("(max-width: 750px)").matches ? 2 : 301));
+  const height = 360, padding = 30;
+  const rotate = width > height * 1.3 && Math.max(...data.nodes.map(n=>n.y))-Math.min(...data.nodes.map(n=>n.y)) > Math.max(...data.nodes.map(n=>n.x))-Math.min(...data.nodes.map(n=>n.x));
+  const xy = (n) => rotate ? {x:n.y,y:-n.x} : n;
+  const xs = data.nodes.map((n) => xy(n).x), ys = data.nodes.map((n) => xy(n).y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const scale = Math.min((width - 2 * padding) / Math.max(.01, maxX - minX), (height - 2 * padding) / Math.max(.01, maxY - minY));
+  const pos = (n) => ({x: width / 2 + (xy(n).x - (minX + maxX) / 2) * scale, y: height / 2 + (xy(n).y - (minY + maxY) / 2) * scale});
   const nodeMap = new Map(data.nodes.map((n) => [n.id, n]));
+  const pairKey = (a, b) => [a,b].sort((x,y) => x-y).join(":");
+  const withheld = new Set(split?.positiveEdges.map(([a,b]) => pairKey(a,b)) || []);
+  const observed = data.edges.filter((e) => !withheld.has(pairKey(e.source,e.target)));
+  const neighbours = new Set(observed.flatMap((e) => e.source === selected ? [e.target] : e.target === selected ? [e.source] : []));
+  const emphasize = !active && !split && highlight;
+  const line = (source, target, kind) => {
+    const a = pos(nodeMap.get(source)), b = pos(nodeMap.get(target));
+    const incident = source === selected || target === selected;
+    const color = kind === "withheld" ? "#ad5b2a" : kind === "negative" ? "#506aad" : incident && emphasize ? "#245940" : "#bcc9c0";
+    return `<line data-edge="${pairKey(source,target)}" data-kind="${kind}" data-incident="${incident}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${color}" stroke-width="${kind !== "observed" || incident && emphasize ? 2.5 : 1.2}" opacity="${emphasize && !incident ? .3 : 1}" ${kind !== "observed" ? `stroke-dasharray="${kind === "withheld" ? "7 4" : "2 5"}"` : ""}/>`;
+  };
+  const edges = observed.map((e) => line(e.source,e.target,"observed")).join("") +
+    (split && revealLinks ? split.positiveEdges.map(([a,b]) => line(a,b,"withheld")).join("") : "") +
+    (split?.negativeEdges.length ? line(...split.negativeEdges[0], "negative") : "");
   const max = Math.max(...data.nodes.map((n) => n[size]));
-  const edges = data.edges
-    .map((e) => {
-      const a = pos(nodeMap.get(e.source)),
-        b = pos(nodeMap.get(e.target));
-      return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#cbd6c9" stroke-width="1.3"/>`;
-    })
-    .join("");
-  const nodes = data.nodes
-    .map((n) => {
-      const p = pos(n),
-        group = partition[n.id] ?? n.reference,
-        r = 8 + Math.sqrt(n[size] / max) * 9;
-      const on = active === null || active.has(n.id);
-      return `<g class="node" role="button" tabindex="0" data-node="${n.id}" aria-label="Inspect node ${n.id}, group ${group + 1}, ${n.degree_count} neighbours" aria-pressed="${n.id === selected}"><circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${on ? colors[group % colors.length] : "#fff"}" stroke="${n.id === selected ? "#152a1c" : colors[group % colors.length]}" stroke-width="${n.id === selected ? 4 : 1.5}"/><text x="${p.x}" y="${p.y + 4}" text-anchor="middle" font-size="10" font-weight="700" fill="${on ? "#fff" : "#24362d"}">${n.id}</text>${seeds.includes(n.id) ? `<circle cx="${p.x}" cy="${p.y}" r="${r + 5}" fill="none" stroke="#1d3927" stroke-dasharray="3 2"/>` : ""}</g>`;
-    })
-    .join("");
-  return `<figure class="plot"><svg viewBox="0 0 680 440" aria-label="${data.name} graph, select a numbered node to inspect its position" role="group">${edges}${nodes}</svg><figcaption>${active ? "Filled nodes are active; dashed rings identify seeds." : "Colour: community. Numbers: node IDs."}</figcaption></figure>`;
+  const labels = new Map(), occupied = [];
+  for (const n of data.nodes) {
+    const p = pos(n);
+    const offsets = [[0,0],[0,-28],[0,28],[-28,0],[28,0],[0,-44],[0,44]];
+    const offset = offsets.find(([dx,dy]) => {
+      const x=p.x+dx,y=p.y+dy;
+      return x>12 && x<width-12 && y>12 && y<height-12 &&
+        !occupied.some(([a,b]) => Math.abs(x-a)<23 && Math.abs(y-b)<18) &&
+        !data.nodes.some(other => other.id!==n.id && Math.hypot(x-pos(other).x,y-pos(other).y)<23);
+    }) || [0,0];
+    labels.set(n.id,offset); occupied.push([p.x+offset[0],p.y+offset[1]]);
+  }
+  const nodes = data.nodes.map((n) => {
+    const p = pos(n), group = partition[n.id] ?? n.reference, r = 8 + Math.sqrt(n[size] / max) * 9;
+    const [dx,dy] = labels.get(n.id);
+    const moved = dx !== 0 || dy !== 0;
+    const on = active === null || active.has(n.id), related = n.id === selected || neighbours.has(n.id);
+    return `<g class="node" role="button" tabindex="0" data-node="${n.id}" data-related="${related}" aria-label="Inspect node ${n.id}, group ${group + 1}, ${n.degree_count} neighbours" aria-pressed="${n.id === selected}" opacity="${emphasize && !related ? .35 : 1}"><circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${on ? colors[group % colors.length] : "#fff"}" stroke="${n.id === selected ? "#152a1c" : colors[group % colors.length]}" stroke-width="${n.id === selected ? 4 : 1.5}"/>${moved ? `<line x1="${p.x}" y1="${p.y}" x2="${p.x+dx}" y2="${p.y+dy}" stroke="#586d60"/><rect x="${p.x+dx-11}" y="${p.y+dy-9}" width="22" height="18" fill="#fbfcfb"/>` : ""}<text x="${p.x+dx}" y="${p.y+dy + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="${on && !moved ? "#fff" : "#24362d"}">${n.id}</text>${seeds.includes(n.id) ? `<circle cx="${p.x}" cy="${p.y}" r="${r + 5}" fill="none" stroke="#1d3927" stroke-dasharray="3 2"/>` : ""}</g>`;
+  }).join("");
+  const caption = split ? `${revealLinks ? "Dashed orange: withheld links." : "Withheld links are hidden."} Dotted blue: a pair with no recorded link.` : active ? "Filled nodes are active; dashed rings identify seeds." : highlight ? `Node ${selected} and its neighbours are highlighted. Colour: community.` : "Select a node to highlight its connections. Colour: community.";
+  return `<figure class="plot"><svg viewBox="0 0 ${width} ${height}" aria-label="${data.name} graph, select a numbered node to inspect its position" role="group">${edges}${nodes}</svg><figcaption>${caption}</figcaption></figure>`;
 }
 function details(partition) {
   const n = data.nodes.find((n) => n.id === selected) ?? data.nodes[0];
   return `<label>Select node<select id="node-picker">${options(
     data.nodes.map((n) => n.id),
     selected,
-  )}</select></label><h2>Node ${n.id}</h2><p>Reference group ${n.reference + 1} · ${view === "groups" ? `displayed group ${(partition[n.id] ?? n.reference) + 1}` : "inspect an activated node or a seed"}</p><dl><dt>Neighbours</dt><dd>${n.degree_count}</dd><dt>PageRank</dt><dd>${fmt(n.pagerank, 4)}</dd><dt>Betweenness</dt><dd>${fmt(n.betweenness, 4)}</dd><dt>Eigenvector</dt><dd>${fmt(n.eigenvector, 4)}</dd></dl><details><summary>Metric definitions</summary><p class="muted">Degree counts immediate neighbours. PageRank rewards links from well-connected nodes. Betweenness measures how often a node lies on shortest paths. </p></details>`;
+  )}</select></label><h2>Node ${n.id}</h2><p>Reference group ${n.reference + 1} · ${view === "groups" ? `displayed group ${(partition[n.id] ?? n.reference) + 1}` : view === "links" ? "metrics below describe the original graph" : "inspect an activated node or a seed"}</p><dl><dt>Neighbours</dt><dd>${n.degree_count}</dd><dt>PageRank</dt><dd>${fmt(n.pagerank, 4)}</dd><dt>Betweenness</dt><dd>${fmt(n.betweenness, 4)}</dd><dt>Eigenvector</dt><dd>${fmt(n.eigenvector, 4)}</dd></dl><details><summary>Metric definitions</summary><p class="muted">Degree counts immediate neighbours. PageRank rewards links from well-connected nodes. Betweenness measures how often a node lies on shortest paths. </p></details>`;
 }
 function render() {
   if (!data) return;
@@ -90,13 +119,13 @@ function render() {
     .querySelectorAll("[data-view]")
     .forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === view));
   const partition =
-    method === "Reference groups"
+    reference
       ? Object.fromEntries(data.nodes.map((n) => [n.id, n.reference]))
       : data.communities.find((c) => c.method === method).partition;
   let content = "";
   if (view === "groups") {
     const best = [...data.communities].sort((a, b) => b.nmi - a.nmi)[0];
-    content = `<div class="experiment"><section><div class="controls"><label>Display groups<select id="method">${options(["Reference groups", ...data.communities.map((c) => c.method)], method)}</select></label><label>Size nodes by<select id="size">${options(["pagerank", "degree", "betweenness"], size)}</select></label></div>${graph(partition)}</section><aside>${details(partition)}<p class="observation">${best.method} has the highest agreement with reference groups: NMI ${fmt(best.nmi)}.</p></aside></div><h3>Partition comparison</h3>${table(
+    content = `<div class="experiment"><section><div class="controls"><label>Community method<select id="method" ${reference ? "disabled" : ""}>${options(data.communities.map((c) => c.method), method)}</select></label><button id="reference" aria-pressed="${reference}">Reference groups</button><label>Size nodes by<select id="size">${[["pagerank","PageRank"],["degree","Connections"],["betweenness","Betweenness"]].map(([v,label]) => `<option value="${v}" ${size === v ? "selected" : ""}>${label}</option>`).join("")}</select></label></div>${graph(partition)}${highlight ? `<button class="clear-selection" id="show-all">Show all connections</button>` : ""}</section><aside>${details(partition)}<p class="observation">${best.method} has the highest agreement with reference groups: NMI ${fmt(best.nmi)}.</p></aside></div><h3>Partition comparison</h3>${table(
       ["Method", "Groups", "Modularity", "NMI ↑", "Adjusted Rand ↑"],
       data.communities.map((c) => [
         c.method,
@@ -123,7 +152,7 @@ function render() {
     content = `<div class="experiment"><section><div class="controls"><label>Seed strategy<select id="strategy">${options(
       rows.map((r) => r.strategy),
       strategy,
-    )}</select></label><label>Seed count<select id="count">${options([1, 3, 5], count)}</select></label><label>Propagation probability<select id="probability">${options([0.05, 0.1, 0.2], probability)}</select></label></div><div class="controls"><button id="restart">Restart replay</button><button id="step" ${frame === chosen.replay.length - 1 ? "disabled" : ""}>Next wave →</button><span>Wave ${frame} · ${active.size} active nodes</span></div>${graph(Object.fromEntries(data.nodes.map((n) => [n.id, n.reference])), active, chosen.seeds)}</section><aside><h2>Simulated reach</h2><p>Each active node gets one chance to activate each neighbour.</p><p>Seeds: <strong>${chosen.seeds.join(", ")}</strong></p><div class="note">${same.length ? `${same.join(" and ")} selects the same seed set. Paired trials must therefore give the same reach.` : `${strategy} reaches ${pct(chosen.mean)} on average across ${chosen.reaches.length} paired trials. The replay shows trial 0, not the average.`}</div>${details(partition)}</aside></div><h3>Reach across paired trials</h3><div class="bars">${rows.map((r) => `<div class="bar-row"><span>${r.strategy}</span><div class="track"><div class="fill" style="width:${r.mean * 100}%"></div><div class="spread" style="left:${Math.max(0, r.mean - r.std) * 100}%;width:${(Math.min(1, r.mean + r.std) - Math.max(0, r.mean - r.std)) * 100}%"></div></div><span>${pct(r.mean)}</span></div>`).join("")}</div>${table(
+    )}</select></label><label>Seed count<select id="count">${options([1, 3, 5], count)}</select></label><label>Propagation probability<select id="probability">${options([0.05, 0.1, 0.2], probability)}</select></label></div><div class="controls"><button id="restart">Restart replay</button><button id="step" ${frame === chosen.replay.length - 1 ? "disabled" : ""}>Next wave →</button><strong>Wave ${frame} · ${active.size} active nodes</strong><span>Seeds: ${chosen.seeds.join(", ")}</span></div>${graph(Object.fromEntries(data.nodes.map((n) => [n.id, n.reference])), active, chosen.seeds)}</section><aside><h2>Simulated reach</h2><p>Each active node gets one chance to activate each neighbour.</p><p>Seeds: <strong>${chosen.seeds.join(", ")}</strong></p><div class="note">${same.length ? `${[strategy, ...same].join(", ")} choose the same ${chosen.seeds.length === 1 ? "seed" : "seeds"} here and have the same simulated reach.` : `${strategy} reaches ${pct(chosen.mean)} on average across ${chosen.reaches.length} paired trials. The replay shows trial 0, not the average.`}</div>${details(partition)}</aside></div><h3>Reach across paired trials</h3><div class="bars">${rows.map((r) => `<div class="bar-row"><span>${r.strategy}</span><div class="track"><div class="fill" style="width:${r.mean * 100}%"></div><div class="spread" style="left:${Math.max(0, r.mean - r.std) * 100}%;width:${(Math.min(1, r.mean + r.std) - Math.max(0, r.mean - r.std)) * 100}%"></div></div><span>${pct(r.mean)}</span></div>`).join("")}</div>${table(
       ["Strategy", "Mean reach", "SD of reach", "Seeds"],
       rows.map((r) => [
         r.strategy,
@@ -131,13 +160,15 @@ function render() {
         pct(r.std),
         r.seeds.join(", "),
       ]),
-    )}<p class="muted">Dark bars show ±1 standard deviation, not confidence intervals. Random chooses one fixed seed set; trials vary propagation only. Shared live-edge worlds make strategy comparisons paired.</p>`;
+    )}<p class="muted">Dark bars show ±1 standard deviation, not confidence intervals. Random chooses one fixed seed set; trials vary propagation only. Every strategy is tested with the same propagation draws.</p>`;
   } else if (view === "links") {
     const best = [...data.linkComparison].sort(
         (a, b) => b.aucMean - a.aucMean,
       )[0],
       ml = data.linkComparison.find((r) => r.method === "Gradient Boosting");
-    content = `<h2>Link recovery</h2><p>Remove edges, rebuild every graph feature, and score balanced held-out edges and true non-edges. Repeat across ${data.linkRuns.length} seeded splits on this graph.</p><div class="note">${best.method} leads at mean ROC-AUC ${fmt(best.aucMean)}. Gradient Boosting scores ${fmt(ml.aucMean)}${ml.aucMean < best.aucMean ? " — additional model complexity did not improve the mean result." : "."}</div>${table(
+    const split = data.linkRuns[splitIndex];
+    const negative = split.negativeEdges[0];
+    content = `<div class="experiment link-example"><section><div class="controls"><label>Split<select id="split">${data.linkRuns.map((r,i) => `<option value="${i}" ${i === splitIndex ? "selected" : ""}>${i+1} · seed ${r.seed}</option>`).join("")}</select></label><button id="reveal-links" aria-pressed="${revealLinks}">${revealLinks ? "Hide withheld links" : "Show withheld links"}</button></div>${graph(partition, null, [], split)}</section><aside><h2>Which links are missing?</h2><p>${split.positiveEdges.length} recorded connections were removed. The remaining ${split.trainEdges} connections are the input to each method.</p><p>The dotted pair, <strong>${negative.join("–")}</strong>, has no recorded connection. It is one negative test example.</p><p>This picture explains one split. The results below summarize all ${data.linkRuns.length} splits.</p>${details(partition)}</aside></div><h2>Link recovery results</h2><p>Remove edges, rebuild every graph feature, and score balanced held-out edges and true non-edges. Repeat across ${data.linkRuns.length} seeded splits on this graph.</p><div class="note">${best.method} leads at mean ROC-AUC ${fmt(best.aucMean)}. Gradient Boosting scores ${fmt(ml.aucMean)}${ml.aucMean < best.aucMean ? " — additional model complexity did not improve the mean result." : "."}</div>${table(
       [
         "Method",
         "Mean ROC-AUC ↑",
@@ -173,6 +204,7 @@ function render() {
   document.querySelectorAll("[data-node]").forEach((el) => {
     const choose = () => {
       selected = Number(el.dataset.node);
+      highlight = true;
       render();
       document.querySelector(`[data-node="${selected}"]`)?.focus();
     };
@@ -185,7 +217,8 @@ function render() {
     };
   });
   for (const [id, update] of Object.entries({
-    "node-picker": (v) => (selected = +v),
+    split: (v) => { splitIndex = +v; revealLinks = false; },
+    "node-picker": (v) => { selected = +v; highlight = true; },
     method: (v) => (method = v),
     size: (v) => (size = v),
     count: (v) => {
@@ -209,6 +242,9 @@ function render() {
         $(`#${id}`).focus();
       };
   }
+  if ($("#show-all")) $("#show-all").onclick = () => { highlight = false; render(); $("#node-picker").focus(); };
+  if ($("#reference")) $("#reference").onclick = () => { reference = !reference; render(); $("#reference").focus(); };
+  if ($("#reveal-links")) $("#reveal-links").onclick = () => { revealLinks = !revealLinks; render(); $("#reveal-links").focus(); };
   if ($("#step"))
     $("#step").onclick = () => {
       frame++;
@@ -251,7 +287,9 @@ async function load() {
 $("#dataset").onchange = () => {
   data = bundle.experiments.find((e) => e.id === $("#dataset").value);
   selected = 0;
+  highlight = false;
   frame = 0;
+  splitIndex = 0; revealLinks = false;
   render();
 };
 document.querySelectorAll("[data-view]").forEach(
@@ -273,4 +311,15 @@ $("#download").onclick = () => {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+let previousWidth = 0;
+new ResizeObserver(([entry]) => {
+  const width = Math.round(entry.contentRect.width);
+  if (width === previousWidth) return;
+  previousWidth = width;
+  const focusId = document.activeElement?.id;
+  const node = document.activeElement?.dataset.node;
+  render();
+  if (focusId) document.getElementById(focusId)?.focus({preventScroll:true});
+  else if (node) document.querySelector(`[data-node="${node}"]`)?.focus({preventScroll:true});
+}).observe($("#workspace"));
 load();
