@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test:browser": "playwright test",
-    "build": "node scripts/build-static.mjs"
+    "build": "node scripts/build-static.mjs",
+    "test:unit": "node --test tests/graph-view.test.js"
   },
   "devDependencies": {
     "@playwright/test": "1.61.0",

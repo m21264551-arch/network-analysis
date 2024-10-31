@@ -1,3 +1,4 @@
+import { alignPartitionColours } from "./graph-view.js";
 const $ = (selector) => document.querySelector(selector);
 const colors = [
   "#2e6749",
@@ -9,7 +10,7 @@ const colors = [
   "#746554",
   "#7245a1",
 ];
-const symbols = ["●", "■", "▲", "◆", "✚", "○", "□", "△"];
+
 const fmt = (n, d = 3) => (Number.isFinite(n) ? n.toFixed(d) : "Unavailable");
 const pct = (n) => `${fmt(n * 100, 1)}%`;
 let bundle,
@@ -26,6 +27,8 @@ let bundle,
   count = 3,
   strategy = "PageRank",
   frame = 0;
+let compare = false, comparisonMethod = "Reference groups", viewport = { zoom: 1, x: 0, y: 0 };
+let suppressClick = false;
 function validate(value) {
   if (
     value.schemaVersion !== 1 ||
@@ -53,15 +56,16 @@ const options = (items, value) =>
         `<option ${String(x) === String(value) ? "selected" : ""}>${x}</option>`,
     )
     .join("");
-function graph(partition, active = null, seeds = [], split = null) {
-  const width = Math.max(280, $("#workspace").clientWidth - (matchMedia("(max-width: 750px)").matches ? 2 : 301));
-  const height = 360, padding = 30;
-  const rotate = width > height * 1.3 && Math.max(...data.nodes.map(n=>n.y))-Math.min(...data.nodes.map(n=>n.y)) > Math.max(...data.nodes.map(n=>n.x))-Math.min(...data.nodes.map(n=>n.x));
-  const xy = (n) => rotate ? {x:n.y,y:-n.x} : n;
-  const xs = data.nodes.map((n) => xy(n).x), ys = data.nodes.map((n) => xy(n).y);
+function graph(partition, active = null, seeds = [], split = null, colourMap = null, pane = "primary") {
+  const comparison = compare && view === "groups";
+  const small = matchMedia("(max-width: 999px)").matches;
+  const available = $("#workspace").clientWidth;
+  const width = Math.max(280, comparison && !small ? (available - 16) / 2 : available - (small ? 0 : 272));
+  const height = small ? 350 : Math.max(420, innerHeight - 230), padding = 36;
+  const xs = data.nodes.map(n => n.x), ys = data.nodes.map(n => n.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  const scale = Math.min((width - 2 * padding) / Math.max(.01, maxX - minX), (height - 2 * padding) / Math.max(.01, maxY - minY));
-  const pos = (n) => ({x: width / 2 + (xy(n).x - (minX + maxX) / 2) * scale, y: height / 2 + (xy(n).y - (minY + maxY) / 2) * scale});
+  const scale = Math.min((width-2*padding)/Math.max(.01,maxX-minX),(height-2*padding)/Math.max(.01,maxY-minY));
+  const pos = n => ({x:width/2+(n.x-(minX+maxX)/2)*scale,y:height/2+(n.y-(minY+maxY)/2)*scale});
   const nodeMap = new Map(data.nodes.map((n) => [n.id, n]));
   const pairKey = (a, b) => [a,b].sort((x,y) => x-y).join(":");
   const withheld = new Set(split?.positiveEdges.map(([a,b]) => pairKey(a,b)) || []);
@@ -79,7 +83,7 @@ function graph(partition, active = null, seeds = [], split = null) {
     (split?.negativeEdges.length ? line(...split.negativeEdges[0], "negative") : "");
   const max = Math.max(...data.nodes.map((n) => n[size]));
   const labels = new Map(), occupied = [];
-  for (const n of data.nodes) {
+  for (const n of [...data.nodes].sort((a,b) => (a.id===selected ? -2 : neighbours.has(a.id) ? -1 : 0) - (b.id===selected ? -2 : neighbours.has(b.id) ? -1 : 0))) {
     const p = pos(n);
     const offsets = [[0,0],[0,-28],[0,28],[-28,0],[28,0],[0,-44],[0,44]];
     const offset = offsets.find(([dx,dy]) => {
@@ -87,18 +91,23 @@ function graph(partition, active = null, seeds = [], split = null) {
       return x>12 && x<width-12 && y>12 && y<height-12 &&
         !occupied.some(([a,b]) => Math.abs(x-a)<23 && Math.abs(y-b)<18) &&
         !data.nodes.some(other => other.id!==n.id && Math.hypot(x-pos(other).x,y-pos(other).y)<23);
-    }) || [0,0];
-    labels.set(n.id,offset); occupied.push([p.x+offset[0],p.y+offset[1]]);
+    });
+    const chosen = offset || (n.id === selected ? [0,-28] : null);
+    labels.set(n.id,chosen); if(chosen) occupied.push([p.x+chosen[0],p.y+chosen[1]]);
   }
+  const coloursFor = group => colors[(colourMap?.[group] ?? group) % colors.length];
   const nodes = data.nodes.map((n) => {
     const p = pos(n), group = partition[n.id] ?? n.reference, r = 8 + Math.sqrt(n[size] / max) * 9;
-    const [dx,dy] = labels.get(n.id);
+    const label = labels.get(n.id), [dx,dy] = label || [0,0];
+    const colour = coloursFor(group);
     const moved = dx !== 0 || dy !== 0;
     const on = active === null || active.has(n.id), related = n.id === selected || neighbours.has(n.id);
-    return `<g class="node" role="button" tabindex="0" data-node="${n.id}" data-related="${related}" aria-label="Inspect node ${n.id}, group ${group + 1}, ${n.degree_count} neighbours" aria-pressed="${n.id === selected}" opacity="${emphasize && !related ? .35 : 1}"><circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${on ? colors[group % colors.length] : "#fff"}" stroke="${n.id === selected ? "#152a1c" : colors[group % colors.length]}" stroke-width="${n.id === selected ? 4 : 1.5}"/>${moved ? `<line x1="${p.x}" y1="${p.y}" x2="${p.x+dx}" y2="${p.y+dy}" stroke="#586d60"/><rect x="${p.x+dx-11}" y="${p.y+dy-9}" width="22" height="18" fill="#fbfcfb"/>` : ""}<text x="${p.x+dx}" y="${p.y+dy + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="${on && !moved ? "#fff" : "#24362d"}">${n.id}</text>${seeds.includes(n.id) ? `<circle cx="${p.x}" cy="${p.y}" r="${r + 5}" fill="none" stroke="#1d3927" stroke-dasharray="3 2"/>` : ""}</g>`;
+    return `<g class="node" role="button" tabindex="0" data-node="${n.id}" data-pane="${pane}" data-related="${related}" aria-label="Inspect node ${n.id}, group ${group + 1}, ${n.degree_count} neighbours" aria-pressed="${n.id === selected}" opacity="${emphasize && !related ? .35 : 1}"><circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${on ? colour : "#fff"}" stroke="${n.id === selected ? "#152a1c" : colour}" stroke-width="${n.id === selected ? 4 : 1.5}"/>${label && moved ? `<line x1="${p.x}" y1="${p.y}" x2="${p.x+dx}" y2="${p.y+dy}" stroke="#586d60"/><rect x="${p.x+dx-11}" y="${p.y+dy-9}" width="22" height="18" fill="#fbfcfb"/>` : ""}${label ? `<text x="${p.x+dx}" y="${p.y+dy + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="${on && !moved ? "#fff" : "#24362d"}">${n.id}</text>` : ""}${seeds.includes(n.id) ? `<circle cx="${p.x}" cy="${p.y}" r="${r + 5}" fill="none" stroke="#1d3927" stroke-dasharray="3 2"/>` : ""}</g>`;
   }).join("");
   const caption = split ? `${revealLinks ? "Dashed orange: withheld links." : "Withheld links are hidden."} Dotted blue: a pair with no recorded link.` : active ? "Filled nodes are active; dashed rings identify seeds." : highlight ? `Node ${selected} and its neighbours are highlighted. Colour: community.` : "Select a node to highlight its connections. Colour: community.";
-  return `<figure class="plot"><svg viewBox="0 0 ${width} ${height}" aria-label="${data.name} graph, select a numbered node to inspect its position" role="group">${edges}${nodes}</svg><figcaption>${caption}</figcaption></figure>`;
+  const transform = `translate(${width/2+viewport.x*width} ${height/2+viewport.y*height}) scale(${viewport.zoom}) translate(${-width/2} ${-height/2})`;
+  return `<figure class="plot"><svg class="graph-canvas" viewBox="0 0 ${width} ${height}" data-pane="${pane}" data-viewport="${JSON.stringify(viewport).replaceAll('"','&quot;')}" tabindex="0" aria-label="${data.name} graph, select a numbered node to inspect its position. Arrow keys pan; plus and minus zoom; Home fits the graph." role="group"><g class="graph-geometry" transform="${transform}">${edges}${nodes}</g></svg><figcaption>${caption}</figcaption></figure>`;
+
 }
 function details(partition) {
   const n = data.nodes.find((n) => n.id === selected) ?? data.nodes[0];
@@ -125,10 +134,13 @@ function render() {
   let content = "";
   if (view === "groups") {
     const best = [...data.communities].sort((a, b) => b.nmi - a.nmi)[0];
-    content = `<div class="experiment"><section><div class="controls"><label>Community method<select id="method" ${reference ? "disabled" : ""}>${options(data.communities.map((c) => c.method), method)}</select></label><button id="reference" aria-pressed="${reference}">Reference groups</button><label>Size nodes by<select id="size">${[["pagerank","PageRank"],["degree","Connections"],["betweenness","Betweenness"]].map(([v,label]) => `<option value="${v}" ${size === v ? "selected" : ""}>${label}</option>`).join("")}</select></label></div>${graph(partition)}${highlight ? `<button class="clear-selection" id="show-all">Show all connections</button>` : ""}</section><aside>${details(partition)}<p class="observation">${best.method} has the highest agreement with reference groups: NMI ${fmt(best.nmi)}.</p></aside></div><h3>Partition comparison</h3>${table(
+    const other = comparisonMethod === "Reference groups" ? Object.fromEntries(data.nodes.map(n=>[n.id,n.reference])) : data.communities.find(c=>c.method===comparisonMethod).partition;
+    const colourMap = alignPartitionColours(partition, other);
+    const controls = `<div class="controls"><label>Community method<select id="method" ${reference ? "disabled" : ""}>${options(data.communities.map((c) => c.method), method)}</select></label><button id="reference" aria-pressed="${reference}">Reference groups</button><label>Size nodes by<select id="size">${[["pagerank","PageRank"],["degree","Connections"],["betweenness","Betweenness"]].map(([v,label]) => `<option value="${v}" ${size === v ? "selected" : ""}>${label}</option>`).join("")}</select></label><button id="compare" aria-pressed="${compare}">Compare partitions</button></div>`;
+    content = `${controls}${compare ? `<div class="partition-panes"><section><h2>${reference ? "Reference groups" : method}</h2>${graph(partition)}</section><section><label>Compare with<select id="compare-method">${options(["Reference groups",...data.communities.map(c=>c.method)],comparisonMethod)}</select></label>${graph(other,null,[],null,colourMap,"comparison")}</section></div><aside class="shared-inspector">${details(partition)}<p>Colours are aligned by shared members. Group labels and scores are unchanged.</p></aside>` : `<div class="experiment"><section>${graph(partition)}${highlight ? `<button class="clear-selection" id="show-all">Show all connections</button>` : ""}</section><aside>${details(partition)}<p class="observation">${best.method} has the highest agreement with reference groups: NMI ${fmt(best.nmi)}.</p></aside></div>`}<h3>Partition comparison</h3>${table(
       ["Method", "Groups", "Modularity", "NMI ↑", "Adjusted Rand ↑"],
       data.communities.map((c) => [
-        c.method,
+        `<span ${c.method === method && !reference ? 'class="chosen-method"' : ""}>${c.method}${c.method === method && !reference ? " · selected" : ""}</span>`,
         c.num_communities,
         fmt(c.modularity),
         fmt(c.nmi),
@@ -152,7 +164,7 @@ function render() {
     content = `<div class="experiment"><section><div class="controls"><label>Seed strategy<select id="strategy">${options(
       rows.map((r) => r.strategy),
       strategy,
-    )}</select></label><label>Seed count<select id="count">${options([1, 3, 5], count)}</select></label><label>Propagation probability<select id="probability">${options([0.05, 0.1, 0.2], probability)}</select></label></div><div class="controls"><button id="restart">Restart replay</button><button id="step" ${frame === chosen.replay.length - 1 ? "disabled" : ""}>Next wave →</button><strong>Wave ${frame} · ${active.size} active nodes</strong><span>Seeds: ${chosen.seeds.join(", ")}</span></div>${graph(Object.fromEntries(data.nodes.map((n) => [n.id, n.reference])), active, chosen.seeds)}</section><aside><h2>Simulated reach</h2><p>Each active node gets one chance to activate each neighbour.</p><p>Seeds: <strong>${chosen.seeds.join(", ")}</strong></p><div class="note">${same.length ? `${[strategy, ...same].join(", ")} choose the same ${chosen.seeds.length === 1 ? "seed" : "seeds"} here and have the same simulated reach.` : `${strategy} reaches ${pct(chosen.mean)} on average across ${chosen.reaches.length} paired trials. The replay shows trial 0, not the average.`}</div>${details(partition)}</aside></div><h3>Reach across paired trials</h3><div class="bars">${rows.map((r) => `<div class="bar-row"><span>${r.strategy}</span><div class="track"><div class="fill" style="width:${r.mean * 100}%"></div><div class="spread" style="left:${Math.max(0, r.mean - r.std) * 100}%;width:${(Math.min(1, r.mean + r.std) - Math.max(0, r.mean - r.std)) * 100}%"></div></div><span>${pct(r.mean)}</span></div>`).join("")}</div>${table(
+    )}</select></label><label>Seed count<select id="count">${options([1, 3, 5], count)}</select></label><label>Propagation probability<select id="probability">${options([0.05, 0.1, 0.2], probability)}</select></label></div>${graph(Object.fromEntries(data.nodes.map((n) => [n.id, n.reference])), active, chosen.seeds)}<div class="controls"><button id="restart">Restart replay</button><button id="step" ${frame === chosen.replay.length - 1 ? "disabled" : ""}>Next wave →</button><strong>Wave ${frame} · ${active.size} active nodes</strong><span>Seeds: ${chosen.seeds.join(", ")}</span></div></section><aside><h2>Simulated reach</h2><p>Each active node gets one chance to activate each neighbour.</p><p>Seeds: <strong>${chosen.seeds.join(", ")}</strong></p><div class="note">${same.length ? `${[strategy, ...same].join(", ")} choose the same ${chosen.seeds.length === 1 ? "seed" : "seeds"} here and have the same simulated reach.` : `${strategy} reaches ${pct(chosen.mean)} on average across ${chosen.reaches.length} paired trials. The replay shows trial 0, not the average.`}</div>${details(partition)}</aside></div><h3>Reach across paired trials</h3><div class="bars">${rows.map((r) => `<div class="bar-row"><span>${r.strategy}</span><div class="track"><div class="fill" style="width:${r.mean * 100}%"></div><div class="spread" style="left:${Math.max(0, r.mean - r.std) * 100}%;width:${(Math.min(1, r.mean + r.std) - Math.max(0, r.mean - r.std)) * 100}%"></div></div><span>${pct(r.mean)}</span></div>`).join("")}</div>${table(
       ["Strategy", "Mean reach", "SD of reach", "Seeds"],
       rows.map((r) => [
         r.strategy,
@@ -168,7 +180,7 @@ function render() {
       ml = data.linkComparison.find((r) => r.method === "Gradient Boosting");
     const split = data.linkRuns[splitIndex];
     const negative = split.negativeEdges[0];
-    content = `<div class="experiment link-example"><section><div class="controls"><label>Split<select id="split">${data.linkRuns.map((r,i) => `<option value="${i}" ${i === splitIndex ? "selected" : ""}>${i+1} · seed ${r.seed}</option>`).join("")}</select></label><button id="reveal-links" aria-pressed="${revealLinks}">${revealLinks ? "Hide withheld links" : "Show withheld links"}</button></div>${graph(partition, null, [], split)}</section><aside><h2>Which links are missing?</h2><p>${split.positiveEdges.length} recorded connections were removed. The remaining ${split.trainEdges} connections are the input to each method.</p><p>The dotted pair, <strong>${negative.join("–")}</strong>, has no recorded connection. It is one negative test example.</p><p>This picture explains one split. The results below summarize all ${data.linkRuns.length} splits.</p>${details(partition)}</aside></div><h2>Link recovery results</h2><p>Remove edges, rebuild every graph feature, and score balanced held-out edges and true non-edges. Repeat across ${data.linkRuns.length} seeded splits on this graph.</p><div class="note">${best.method} leads at mean ROC-AUC ${fmt(best.aucMean)}. Gradient Boosting scores ${fmt(ml.aucMean)}${ml.aucMean < best.aucMean ? " — additional model complexity did not improve the mean result." : "."}</div>${table(
+    content = `<div class="experiment link-example"><section>${graph(partition, null, [], split)}<div class="controls"><label>Split<select id="split">${data.linkRuns.map((r,i) => `<option value="${i}" ${i === splitIndex ? "selected" : ""}>${i+1} · seed ${r.seed}</option>`).join("")}</select></label><button id="reveal-links" aria-pressed="${revealLinks}">${revealLinks ? "Hide withheld links" : "Show withheld links"}</button></div></section><aside><h2>Which links are missing?</h2><p>${split.positiveEdges.length} recorded connections were removed. The remaining ${split.trainEdges} connections are the input to each method.</p><p>The dotted pair, <strong>${negative.join("–")}</strong>, has no recorded connection. It is one negative test example.</p><p>This picture explains one split. The results below summarize all ${data.linkRuns.length} splits.</p>${details(partition)}</aside></div><h2>Link recovery results</h2><p>Remove edges, rebuild every graph feature, and score balanced held-out edges and true non-edges. Repeat across ${data.linkRuns.length} seeded splits on this graph.</p><div class="note">${best.method} leads at mean ROC-AUC ${fmt(best.aucMean)}. Gradient Boosting scores ${fmt(ml.aucMean)}${ml.aucMean < best.aucMean ? " — additional model complexity did not improve the mean result." : "."}</div>${table(
       [
         "Method",
         "Mean ROC-AUC ↑",
@@ -197,16 +209,16 @@ function render() {
         r.negativeEdges.length,
       ]),
     )}</details>`;
-  } else {
-    content = `<section class="method"><h2>Data and method</h2><p>This page is a static explorer. Python generates the graph, partitions, centrality scores, propagation trials and link-recovery metrics together. Changing controls selects a saved experiment; it does not train a model in your browser.</p><p class="identity">Generated ${bundle.generatedAt.slice(0, 10)} · code ${bundle.codeRevision.slice(0, 8)}<br>SHA256 ${bundle.sourceChecksum}</p><h3>Graphs and reference labels</h3><p>Karate Club uses Zachary's observed network and subsequent two-group split. The stochastic block models plant four groups of 20 nodes. Strong separation uses p(within)=0.30 and p(between)=0.015; weak separation uses 0.18 and 0.08. All graphs are unweighted, undirected and generated/layout-seeded with 42.</p><h3>Community detection</h3><p>Louvain optimizes modularity. Label propagation follows neighbours' labels. Girvan–Newman removes high-betweenness edges and stops at the known group count. Spectral clustering uses Laplacian eigenvectors with the known group count. Agreement with labels and internal density are distinct criteria.</p><h3>Link recovery</h3><p>Twenty outer splits hold out about 15% of edges while preserving connectivity. Test negatives are true non-edges, disjoint from training negatives. All topology features are rebuilt on the remaining graph. When extracting a positive training pair, that pair's own edge is temporarily removed. Endpoint features use min/max to respect an undirected graph. Fixed Gradient Boosting settings: 200 estimators, depth 3, learning rate 0.05. No row-wise cross-validation over cached graph features is claimed.</p><h3>Influence</h3><p>Independent Cascade uses common directed live-edge worlds across strategies. One fixed set of randomly selected seeds is included as a baseline. One hundred seeded propagation trials per configuration estimate variability, not real social contagion.</p><h3>Reproduce</h3><code>python main.py --export-dashboard data/experiments.json<br>python -m pytest<br>python -m http.server 8080</code><p>Download the bundle for graph coordinates, each partition, exact held-out pairs, per-split scores, every trial's reach and a deterministic replay.</p><h3>Limitations</h3><p>These are three small graphs. Repeated splits share the same underlying topology and are not independent evidence across populations. Connectivity-preserving removal biases the missing-link task. Synthetic groups are planted by construction. A method's performance here cannot establish a general winner.</p><p><a href="https://networkx.org/documentation/stable/reference/generated/networkx.generators.social.karate_club_graph.html">Karate Club source and citation</a> · <a href="https://github.com/m21264551-arch/network-analysis">Full source and setup</a></p></section>`;
   }
-  $("#workspace").innerHTML = content;
+  $("#workspace").innerHTML = `<div class="viewport-controls"><span>Drag to pan · focus graph for arrow keys</span><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="fit-graph">Fit graph</button></div>` + content;
   document.querySelectorAll("[data-node]").forEach((el) => {
     const choose = () => {
+      if(suppressClick) return;
+      const pane = el.dataset.pane;
       selected = Number(el.dataset.node);
       highlight = true;
       render();
-      document.querySelector(`[data-node="${selected}"]`)?.focus();
+      document.querySelector(`[data-node="${selected}"][data-pane="${pane}"]`)?.focus({preventScroll:true});
     };
     el.onclick = choose;
     el.onkeydown = (e) => {
@@ -216,7 +228,10 @@ function render() {
       }
     };
   });
+  wireViewport();
+  if($("#compare")) $("#compare").onclick = () => { compare=!compare; render(); $("#compare").focus({preventScroll:true}); };
   for (const [id, update] of Object.entries({
+    "compare-method": (v) => { comparisonMethod=v; },
     split: (v) => { splitIndex = +v; revealLinks = false; },
     "node-picker": (v) => { selected = +v; highlight = true; },
     method: (v) => (method = v),
@@ -276,6 +291,8 @@ async function load() {
     $("#workspace").hidden = false;
     $("#provenance").textContent =
       `Saved experiments · ${bundle.generatedAt.slice(0, 10)}`;
+    $("#method-content").innerHTML = `<section class="method"><h2>Data and method</h2><p>This page is a static explorer. Python generates the graph, partitions, centrality scores, propagation trials and link-recovery metrics together. Changing controls selects a saved experiment; it does not train a model in your browser.</p><p class="identity">Generated ${bundle.generatedAt.slice(0, 10)} · code ${bundle.codeRevision.slice(0, 8)}<br>SHA256 ${bundle.sourceChecksum}</p><h3>Graphs and reference labels</h3><p>Karate Club uses Zachary's observed network and subsequent two-group split. The stochastic block models plant four groups of 20 nodes. Strong separation uses p(within)=0.30 and p(between)=0.015; weak separation uses 0.18 and 0.08. All graphs are unweighted, undirected and generated/layout-seeded with 42.</p><h3>Community detection</h3><p>Louvain optimizes modularity. Label propagation follows neighbours' labels. Girvan–Newman removes high-betweenness edges and stops at the known group count. Spectral clustering uses Laplacian eigenvectors with the known group count. Agreement with labels and internal density are distinct criteria.</p><h3>Link recovery</h3><p>Twenty outer splits hold out about 15% of edges while preserving connectivity. Test negatives are true non-edges, disjoint from training negatives. All topology features are rebuilt on the remaining graph. When extracting a positive training pair, that pair's own edge is temporarily removed. Endpoint features use min/max to respect an undirected graph. Fixed Gradient Boosting settings: 200 estimators, depth 3, learning rate 0.05. No row-wise cross-validation over cached graph features is claimed.</p><h3>Influence</h3><p>Independent Cascade uses common directed live-edge worlds across strategies. One fixed set of randomly selected seeds is included as a baseline. One hundred seeded propagation trials per configuration estimate variability, not real social contagion.</p><h3>Reproduce</h3><code>python main.py --export-dashboard data/experiments.json<br>python -m pytest<br>python -m http.server 8080</code><p>Download the bundle for graph coordinates, each partition, exact held-out pairs, per-split scores, every trial's reach and a deterministic replay.</p><h3>Limitations</h3><p>These are three small graphs. Repeated splits share the same underlying topology and are not independent evidence across populations. Connectivity-preserving removal biases the missing-link task. Synthetic groups are planted by construction. A method's performance here cannot establish a general winner.</p><p><a href="https://networkx.org/documentation/stable/reference/generated/networkx.generators.social.karate_club_graph.html">Karate Club source and citation</a> · <a href="https://github.com/m21264551-arch/network-analysis">Full source and setup</a></p></section>`;
+    $("#method-link").disabled = false;
     render();
   } catch (error) {
     $("#status").innerHTML =
@@ -287,6 +304,7 @@ async function load() {
 $("#dataset").onchange = () => {
   data = bundle.experiments.find((e) => e.id === $("#dataset").value);
   selected = 0;
+  viewport = {zoom:1,x:0,y:0};
   highlight = false;
   frame = 0;
   splitIndex = 0; revealLinks = false;
@@ -311,15 +329,67 @@ $("#download").onclick = () => {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+function renderPreservingFocus() {
+  const active=document.activeElement;
+  const focusId=active?.id, node=active?.dataset.node;
+  const pane=active?.closest?.('.graph-canvas')?.dataset.pane;
+  render();
+  if(focusId) document.getElementById(focusId)?.focus({preventScroll:true});
+  else if(pane) document.querySelector(`.graph-canvas[data-pane="${pane}"]${node ? ` [data-node="${node}"]` : ''}`)?.focus({preventScroll:true});
+}
 let previousWidth = 0;
 new ResizeObserver(([entry]) => {
-  const width = Math.round(entry.contentRect.width);
-  if (width === previousWidth) return;
-  previousWidth = width;
-  const focusId = document.activeElement?.id;
-  const node = document.activeElement?.dataset.node;
-  render();
-  if (focusId) document.getElementById(focusId)?.focus({preventScroll:true});
-  else if (node) document.querySelector(`[data-node="${node}"]`)?.focus({preventScroll:true});
+  const width=Math.round(entry.contentRect.width);
+  if(width===previousWidth) return;
+  previousWidth=width;
+  renderPreservingFocus();
 }).observe($("#workspace"));
+window.addEventListener("resize", () => { if(data) renderPreservingFocus(); });
 load();
+
+function applyViewport() {
+  document.querySelectorAll(".graph-canvas").forEach(svg => {
+    const {width,height}=svg.viewBox.baseVal;
+    svg.dataset.viewport=JSON.stringify(viewport);
+    svg.querySelector(".graph-geometry").setAttribute("transform",`translate(${width/2+viewport.x*width} ${height/2+viewport.y*height}) scale(${viewport.zoom}) translate(${-width/2} ${-height/2})`);
+  });
+}
+function zoom(factor) { viewport.zoom=Math.max(.5,Math.min(4,viewport.zoom*factor)); applyViewport(); }
+function wireViewport() {
+  $("#zoom-in").onclick=()=>zoom(1.25);
+  $("#zoom-out").onclick=()=>zoom(.8);
+  $("#fit-graph").onclick=()=>{viewport={zoom:1,x:0,y:0};applyViewport();};
+  document.querySelectorAll(".graph-canvas").forEach(svg=>{
+    let drag=null;
+    svg.onkeydown=e=>{
+      if(e.target!==svg) return;
+      if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","+","=","-","Home"].includes(e.key)) return;
+      e.preventDefault();
+      if(e.key==="Home") viewport={zoom:1,x:0,y:0};
+      else if(["+","="].includes(e.key)) zoom(1.25);
+      else if(e.key==="-") zoom(.8);
+      else { viewport.x+=e.key==="ArrowLeft"?.06:e.key==="ArrowRight"?-.06:0; viewport.y+=e.key==="ArrowUp"?.06:e.key==="ArrowDown"?-.06:0; }
+      applyViewport();
+    };
+    svg.onpointerdown=e=>{
+      if(e.button!==0 || e.target.closest(".node")) return;
+      drag={id:e.pointerId,x:e.clientX,y:e.clientY,panX:viewport.x,panY:viewport.y,touch:e.pointerType==="touch",active:false};
+      suppressClick=false;
+    };
+    svg.onpointermove=e=>{
+      if(!drag || drag.id!==e.pointerId) return;
+      const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+      if(!drag.active && Math.hypot(dx,dy)>8) {
+        if(drag.touch && Math.abs(dy)>Math.abs(dx)) {drag=null;return;}
+        drag.active=true;svg.setPointerCapture(e.pointerId);
+      }
+      if(!drag.active) return;
+      const rect=svg.getBoundingClientRect();
+      viewport.x=drag.panX+dx/rect.width;viewport.y=drag.panY+dy/rect.height;
+      suppressClick=true;applyViewport();
+    };
+    const end=()=>{drag=null;setTimeout(()=>{suppressClick=false;},0);};
+    svg.onpointerup=end;svg.onpointercancel=end;
+  });
+}
+$("#method-link").onclick=()=>{ $("#method-details").open=true; $("#method-details").scrollIntoView({block:"start"}); $("#method-details summary").focus({preventScroll:true}); };
