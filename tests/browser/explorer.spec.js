@@ -184,3 +184,39 @@ test('partition comparison synchronizes coordinates, pan, selection and keyboard
   const waiting=page.waitForEvent('download');await page.getByRole('button',{name:'Download data'}).click();
   const d=await waiting;expect(JSON.parse(fs.readFileSync(await d.path(),'utf8')).experiments[0]).toEqual(bundle.experiments[0]);
 });
+
+
+test('one graph Tab stop supports directional inspection and explicit partition differences',async({page})=>{
+ await page.goto('/');await page.locator('.node[tabindex="0"]').waitFor();
+ await expect(page.locator('.node[tabindex="0"]')).toHaveCount(1);
+ await page.locator('.node[tabindex="0"]').focus();await page.keyboard.press('ArrowRight');
+ await expect(page.getByRole('combobox',{name:'Select node',exact:true})).not.toHaveValue('0');
+ await expect(page.locator('.node[tabindex="0"]')).toBeFocused();
+ const selected=await page.getByRole('combobox',{name:'Select node',exact:true}).inputValue();
+ await page.getByRole('button',{name:'Compare partitions',exact:true}).click();
+ await expect(page.locator('.node[tabindex="0"]')).toHaveCount(2);
+ await page.getByRole('button',{name:'Highlight differences',exact:true}).click();
+ const primary=page.locator('.graph-canvas[data-pane="primary"]');
+ const expected=await primary.locator('[data-disagreement="true"]').count();
+ await expect(page.locator('.comparison-reading')).toContainText(`${expected} nodes differ`);
+ await expect(page.getByRole('combobox',{name:'Select node',exact:true})).toHaveValue(selected);
+ await page.getByRole('button',{name:'Node details'}).click();
+ await expect(page.getByRole('heading',{name:`Node ${selected}`,exact:true})).toBeFocused();
+ await expect(page.locator('.group-legend').first()).toContainText('Group 1');
+});
+
+test('desktop influence action stays beside its visible graph',async({page})=>{
+ await page.setViewportSize({width:1280,height:720});await page.goto('/');
+ await page.getByRole('button',{name:'Influence',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Next wave'})).toBeInViewport();
+});
+
+
+test('keyboard selection pans only enough to keep a zoomed node visible',async({page})=>{
+ await page.goto('/');const canvas=page.locator('.graph-canvas');await canvas.waitFor();
+ for(let i=0;i<4;i++) await page.getByRole('button',{name:'Zoom in',exact:true}).click();
+ await page.getByRole('combobox',{name:'Select node',exact:true}).selectOption('14');
+ const box=await canvas.boundingBox(),marker=await page.locator('[data-node="14"] .node-body').boundingBox();
+ expect(marker.x).toBeGreaterThanOrEqual(box.x);expect(marker.x+marker.width).toBeLessThanOrEqual(box.x+box.width);
+ expect(marker.y).toBeGreaterThanOrEqual(box.y);expect(marker.y+marker.height).toBeLessThanOrEqual(box.y+box.height);
+});
