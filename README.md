@@ -8,12 +8,12 @@
 
 ## Walkthrough
 
-1. Use **Compare partitions** to inspect the Karate Club reference groups beside a community algorithm. Both panes share coordinates, pan/zoom and node selection.
+1. Use **Compare partitions** to inspect the Karate Club reference groups beside a community algorithm. Both panes share coordinates, pan/zoom and node selection. **Highlight differences** marks nodes assigned differently after matching group colours.
 2. Switch to strong or weak planted groups and inspect where agreement breaks down.
 3. Compare seed strategies across paired propagation trials. Step through a saved cascade.
 4. Examine missing-link recovery across 20 outer splits, including cases where a learned model loses.
 
-Every count, partition, metric, summary, replay and download comes from `data/experiments.json` (schema v1). Browser controls select bounded precomputed experiments; no analysis server is required. Keyboard node selection and persistent details accompany the graph.
+Every count, partition, metric, summary, replay and download comes from `data/experiments.json` (schema v1). Browser controls select bounded precomputed experiments; no analysis server is required. A labelled community key and persistent node details accompany the graph. Tab enters each graph once; arrow keys inspect nearby nodes, Shift + arrow keys pan, and the node selector reaches every node. Keyboard inspection keeps zoomed nodes in view.
 
 ## Data and protocol
 

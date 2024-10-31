@@ -28,7 +28,7 @@ let bundle,
   strategy = "PageRank",
   frame = 0;
 let compare = false, comparisonMethod = "Reference groups", viewport = { zoom: 1, x: 0, y: 0 };
-let suppressClick = false;
+let suppressClick = false, showDifferences = false, disagreements = new Set();
 function validate(value) {
   if (
     value.schemaVersion !== 1 ||
@@ -61,7 +61,7 @@ function graph(partition, active = null, seeds = [], split = null, colourMap = n
   const small = matchMedia("(max-width: 999px)").matches;
   const available = $("#workspace").clientWidth;
   const width = Math.max(280, comparison && !small ? (available - 16) / 2 : available - (small ? 0 : 272));
-  const height = small ? 350 : Math.max(420, innerHeight - 230), padding = 36;
+  const height = small ? 350 : Math.max(280, innerHeight - (comparison ? 440 : view === "influence" ? 380 : view === "links" ? 300 : 350)), padding = 32;
   const xs = data.nodes.map(n => n.x), ys = data.nodes.map(n => n.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
   const scale = Math.min((width-2*padding)/Math.max(.01,maxX-minX),(height-2*padding)/Math.max(.01,maxY-minY));
@@ -97,24 +97,25 @@ function graph(partition, active = null, seeds = [], split = null, colourMap = n
   }
   const coloursFor = group => colors[(colourMap?.[group] ?? group) % colors.length];
   const nodes = data.nodes.map((n) => {
-    const p = pos(n), group = partition[n.id] ?? n.reference, r = 8 + Math.sqrt(n[size] / max) * 9;
+    const p = pos(n), group = partition[n.id] ?? n.reference, r = 5 + Math.sqrt(n[size] / max) * 6;
     const label = labels.get(n.id), [dx,dy] = label || [0,0];
     const colour = coloursFor(group);
     const moved = dx !== 0 || dy !== 0;
     const on = active === null || active.has(n.id), related = n.id === selected || neighbours.has(n.id);
-    return `<g class="node" role="button" tabindex="0" data-node="${n.id}" data-pane="${pane}" data-related="${related}" aria-label="Inspect node ${n.id}, group ${group + 1}, ${n.degree_count} neighbours" aria-pressed="${n.id === selected}" opacity="${emphasize && !related ? .35 : 1}"><circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${on ? colour : "#fff"}" stroke="${n.id === selected ? "#152a1c" : colour}" stroke-width="${n.id === selected ? 4 : 1.5}"/>${label && moved ? `<line x1="${p.x}" y1="${p.y}" x2="${p.x+dx}" y2="${p.y+dy}" stroke="#586d60"/><rect x="${p.x+dx-11}" y="${p.y+dy-9}" width="22" height="18" fill="#fbfcfb"/>` : ""}${label ? `<text x="${p.x+dx}" y="${p.y+dy + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="${on && !moved ? "#fff" : "#24362d"}">${n.id}</text>` : ""}${seeds.includes(n.id) ? `<circle cx="${p.x}" cy="${p.y}" r="${r + 5}" fill="none" stroke="#1d3927" stroke-dasharray="3 2"/>` : ""}</g>`;
+    return `<g class="node" role="button" tabindex="${n.id === selected ? 0 : -1}" data-node="${n.id}" data-pane="${pane}" data-related="${related}" data-disagreement="${comparison && disagreements.has(n.id)}" aria-label="Inspect node ${n.id}, group ${group + 1}, ${n.degree_count} neighbours" aria-pressed="${n.id === selected}" opacity="${comparison && showDifferences && n.id !== selected && !disagreements.has(n.id) ? .25 : emphasize && !related ? .35 : 1}"><circle class="node-body" cx="${p.x}" cy="${p.y}" r="${r}" fill="${on ? colour : "#fff"}" stroke="${n.id === selected ? "#152a1c" : colour}" stroke-width="${n.id === selected ? 4 : 1.5}"/>${comparison && showDifferences && disagreements.has(n.id) ? `<circle cx="${p.x}" cy="${p.y}" r="${r+4}" fill="none" stroke="#172d20" stroke-width="2" stroke-dasharray="3 2" pointer-events="none"/>` : ""}<circle class="node-hit" cx="${p.x}" cy="${p.y}" r="${Math.max(12,r)}" fill="transparent" stroke="none"/>${label && moved ? `<line x1="${p.x}" y1="${p.y}" x2="${p.x+dx}" y2="${p.y+dy}" stroke="#586d60"/><rect x="${p.x+dx-11}" y="${p.y+dy-9}" width="22" height="18" fill="#fbfcfb"/>` : ""}${label ? `<text x="${p.x+dx}" y="${p.y+dy + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="${on && !moved ? "#fff" : "#24362d"}">${n.id}</text>` : ""}${seeds.includes(n.id) ? `<circle cx="${p.x}" cy="${p.y}" r="${r + 5}" fill="none" stroke="#1d3927" stroke-dasharray="3 2"/>` : ""}</g>`;
   }).join("");
   const caption = split ? `${revealLinks ? "Dashed orange: withheld links." : "Withheld links are hidden."} Dotted blue: a pair with no recorded link.` : active ? "Filled nodes are active; dashed rings identify seeds." : highlight ? `Node ${selected} and its neighbours are highlighted. Colour: community.` : "Select a node to highlight its connections. Colour: community.";
   const transform = `translate(${width/2+viewport.x*width} ${height/2+viewport.y*height}) scale(${viewport.zoom}) translate(${-width/2} ${-height/2})`;
-  return `<figure class="plot"><svg class="graph-canvas" viewBox="0 0 ${width} ${height}" data-pane="${pane}" data-viewport="${JSON.stringify(viewport).replaceAll('"','&quot;')}" tabindex="0" aria-label="${data.name} graph, select a numbered node to inspect its position. Arrow keys pan; plus and minus zoom; Home fits the graph." role="group"><g class="graph-geometry" transform="${transform}">${edges}${nodes}</g></svg><figcaption>${caption}</figcaption></figure>`;
+  return `<figure class="plot"><svg class="graph-canvas" style="height:${height}px" viewBox="0 0 ${width} ${height}" data-pane="${pane}" data-viewport="${JSON.stringify(viewport).replaceAll('"','&quot;')}" tabindex="-1" aria-label="${data.name} graph. Arrow keys move between nodes; Shift and arrow keys pan; plus and minus zoom; Home fits the graph." role="group"><g class="graph-geometry" transform="${transform}">${edges}${nodes}</g></svg><figcaption>${caption}</figcaption>${view === "groups" ? groupLegend(partition,colourMap) : ""}</figure>`;
 
+}
+function groupLegend(partition, colourMap) {
+  const groups=[...new Set(Object.values(partition))].sort((a,b)=>a-b);
+  return `<div class="group-legend" aria-label="Community colour key">${groups.map(group=>`<span><i style="background:${colors[(colourMap?.[group] ?? group)%colors.length]}"></i>Group ${group+1} · ${Object.values(partition).filter(value=>value===group).length} nodes</span>`).join("")}</div>`;
 }
 function details(partition) {
   const n = data.nodes.find((n) => n.id === selected) ?? data.nodes[0];
-  return `<label>Select node<select id="node-picker">${options(
-    data.nodes.map((n) => n.id),
-    selected,
-  )}</select></label><h2>Node ${n.id}</h2><p>Reference group ${n.reference + 1} · ${view === "groups" ? `displayed group ${(partition[n.id] ?? n.reference) + 1}` : view === "links" ? "metrics below describe the original graph" : "inspect an activated node or a seed"}</p><dl><dt>Neighbours</dt><dd>${n.degree_count}</dd><dt>PageRank</dt><dd>${fmt(n.pagerank, 4)}</dd><dt>Betweenness</dt><dd>${fmt(n.betweenness, 4)}</dd><dt>Eigenvector</dt><dd>${fmt(n.eigenvector, 4)}</dd></dl><details><summary>Metric definitions</summary><p class="muted">Degree counts immediate neighbours. PageRank rewards links from well-connected nodes. Betweenness measures how often a node lies on shortest paths. </p></details>`;
+  return `<h2 id="node-details" tabindex="-1">Node ${n.id}</h2><p>Reference group ${n.reference + 1} · ${view === "groups" ? `detected group ${(partition[n.id] ?? n.reference) + 1}` : view === "links" ? "metrics below describe the original graph" : "inspect an activated node or a seed"}</p><dl><dt>Neighbours</dt><dd>${n.degree_count}</dd><dt>PageRank</dt><dd>${fmt(n.pagerank, 4)}</dd><dt>Betweenness</dt><dd>${fmt(n.betweenness, 4)}</dd><dt>Eigenvector</dt><dd>${fmt(n.eigenvector, 4)}</dd></dl><details><summary>Metric definitions</summary><p class="muted">Degree counts immediate neighbours. PageRank rewards links from well-connected nodes. Betweenness measures how often a node lies on shortest paths. </p></details>`;
 }
 function render() {
   if (!data) return;
@@ -136,8 +137,9 @@ function render() {
     const best = [...data.communities].sort((a, b) => b.nmi - a.nmi)[0];
     const other = comparisonMethod === "Reference groups" ? Object.fromEntries(data.nodes.map(n=>[n.id,n.reference])) : data.communities.find(c=>c.method===comparisonMethod).partition;
     const colourMap = alignPartitionColours(partition, other);
+    disagreements = new Set(data.nodes.filter(n => partition[n.id] !== colourMap[other[n.id]]).map(n=>n.id));
     const controls = `<div class="controls"><label>Community method<select id="method" ${reference ? "disabled" : ""}>${options(data.communities.map((c) => c.method), method)}</select></label><button id="reference" aria-pressed="${reference}">Reference groups</button><label>Size nodes by<select id="size">${[["pagerank","PageRank"],["degree","Connections"],["betweenness","Betweenness"]].map(([v,label]) => `<option value="${v}" ${size === v ? "selected" : ""}>${label}</option>`).join("")}</select></label><button id="compare" aria-pressed="${compare}">Compare partitions</button></div>`;
-    content = `${controls}${compare ? `<div class="partition-panes"><section><h2>${reference ? "Reference groups" : method}</h2>${graph(partition)}</section><section><label>Compare with<select id="compare-method">${options(["Reference groups",...data.communities.map(c=>c.method)],comparisonMethod)}</select></label>${graph(other,null,[],null,colourMap,"comparison")}</section></div><aside class="shared-inspector">${details(partition)}<p>Colours are aligned by shared members. Group labels and scores are unchanged.</p></aside>` : `<div class="experiment"><section>${graph(partition)}${highlight ? `<button class="clear-selection" id="show-all">Show all connections</button>` : ""}</section><aside>${details(partition)}<p class="observation">${best.method} has the highest agreement with reference groups: NMI ${fmt(best.nmi)}.</p></aside></div>`}<h3>Partition comparison</h3>${table(
+    content = `${controls}${compare ? `<div class="comparison-reading"><span>${new Set(Object.values(partition)).size} groups vs ${new Set(Object.values(other)).size} · ${disagreements.size} nodes differ after matching group colours.</span><button id="differences" aria-pressed="${showDifferences}">Highlight differences</button></div>` : ""}${compare ? `<div class="partition-panes"><section><h2>${reference ? "Reference groups" : method}</h2>${graph(partition)}</section><section><label>Compare with<select id="compare-method">${options(["Reference groups",...data.communities.map(c=>c.method)],comparisonMethod)}</select></label>${graph(other,null,[],null,colourMap,"comparison")}</section></div><aside class="shared-inspector">${details(partition)}<p>Colours are aligned by shared members. Group labels and scores are unchanged.</p></aside>` : `<div class="experiment"><section>${graph(partition)}${highlight ? `<button class="clear-selection" id="show-all">Show all connections</button>` : ""}</section><aside>${details(partition)}</aside></div>`}<h3>Partition comparison</h3><p class="observation">${best.method} has the highest agreement with reference groups: NMI ${fmt(best.nmi)}. Agreement and modularity measure different things.</p>${table(
       ["Method", "Groups", "Modularity", "NMI ↑", "Adjusted Rand ↑"],
       data.communities.map((c) => [
         `<span ${c.method === method && !reference ? 'class="chosen-method"' : ""}>${c.method}${c.method === method && !reference ? " · selected" : ""}</span>`,
@@ -210,7 +212,9 @@ function render() {
       ]),
     )}</details>`;
   }
-  $("#workspace").innerHTML = `<div class="viewport-controls"><span>Drag to pan · focus graph for arrow keys</span><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="fit-graph">Fit graph</button></div>` + content;
+  $("#workspace").innerHTML = `<div class="viewport-controls"><label class="node-navigation"><span>Select node</span><select id="node-picker">${options(data.nodes.map(n=>n.id),selected)}</select></label><button id="inspect-selected">Node details ↓</button><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="fit-graph">Fit graph</button></div>` + content;
+  $("#inspect-selected").onclick=()=>{ $("#node-details").focus(); $("#node-details").scrollIntoView({block:"nearest"}); };
+  if($("#differences")) $("#differences").onclick=()=>{showDifferences=!showDifferences;render();$("#differences").focus({preventScroll:true});};
   document.querySelectorAll("[data-node]").forEach((el) => {
     const choose = () => {
       if(suppressClick) return;
@@ -222,6 +226,23 @@ function render() {
     };
     el.onclick = choose;
     el.onkeydown = (e) => {
+      if (!e.shiftKey && ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) {
+        e.preventDefault(); e.stopPropagation();
+        const origin=data.nodes.find(n=>n.id===Number(el.dataset.node));
+        const horizontal=["ArrowLeft","ArrowRight"].includes(e.key), sign=["ArrowLeft","ArrowUp"].includes(e.key)?-1:1;
+        const candidates=data.nodes.filter(n=>n.id!==origin.id).map(n=>{
+          const dx=n.x-origin.x,dy=n.y-origin.y,forward=(horizontal?dx:dy)*sign,cross=horizontal?dy:dx;
+          return {n,forward,distance:Math.hypot(dx,dy)+Math.abs(cross)*2};
+        }).filter(n=>n.forward>0).sort((a,b)=>a.distance-b.distance);
+        if(candidates.length) {
+          const pane=el.dataset.pane;
+          selected=candidates[0].n.id;highlight=true;render();
+          const target=document.querySelector(`[data-node="${selected}"][data-pane="${pane}"]`);
+          keepNodeVisible(target);
+          target?.focus({preventScroll:true});
+        }
+        return;
+      }
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         choose();
@@ -254,6 +275,7 @@ function render() {
       el.onchange = () => {
         update(el.value);
         render();
+        if (id === "node-picker") keepNodeVisible(document.querySelector(`.graph-canvas[data-pane="primary"] [data-node="${selected}"]`));
         $(`#${id}`).focus();
       };
   }
@@ -354,6 +376,15 @@ function applyViewport() {
     svg.querySelector(".graph-geometry").setAttribute("transform",`translate(${width/2+viewport.x*width} ${height/2+viewport.y*height}) scale(${viewport.zoom}) translate(${-width/2} ${-height/2})`);
   });
 }
+function keepNodeVisible(node) {
+  if (!node) return;
+  const canvas = node.closest(".graph-canvas").getBoundingClientRect();
+  const marker = node.querySelector(".node-body").getBoundingClientRect();
+  const shift = (start, end, low, high) => start < low + 20 ? low + 20 - start : end > high - 20 ? high - 20 - end : 0;
+  viewport.x += shift(marker.left, marker.right, canvas.left, canvas.right) / canvas.width;
+  viewport.y += shift(marker.top, marker.bottom, canvas.top, canvas.bottom) / canvas.height;
+  applyViewport();
+}
 function zoom(factor) { viewport.zoom=Math.max(.5,Math.min(4,viewport.zoom*factor)); applyViewport(); }
 function wireViewport() {
   $("#zoom-in").onclick=()=>zoom(1.25);
@@ -362,7 +393,7 @@ function wireViewport() {
   document.querySelectorAll(".graph-canvas").forEach(svg=>{
     let drag=null;
     svg.onkeydown=e=>{
-      if(e.target!==svg) return;
+      if(e.target!==svg && !e.shiftKey && !["Home","+","=","-"].includes(e.key)) return;
       if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","+","=","-","Home"].includes(e.key)) return;
       e.preventDefault();
       if(e.key==="Home") viewport={zoom:1,x:0,y:0};
