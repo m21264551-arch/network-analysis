@@ -175,7 +175,10 @@ test('partition comparison synchronizes coordinates, pan, selection and keyboard
   await other.focus();await page.setViewportSize({width:390,height:844});
   await expect(other).toBeFocused();
   await expect(other).toHaveAttribute('data-viewport',viewport);
-  expect(await positions(primary)).toEqual(await positions(other));
+  // Read both panes in one browser turn: resize observers may render between
+  // separate locator evaluations, even though each render updates both panes.
+  const panes=await page.locator('.graph-canvas').evaluateAll(svgs=>svgs.map(svg=>[...svg.querySelectorAll('.node circle:first-child')].map(n=>[n.getAttribute('cx'),n.getAttribute('cy')])));
+  expect(panes[0]).toEqual(panes[1]);
   await other.press('Home');
   await expect(primary).toHaveAttribute('data-viewport',JSON.stringify({zoom:1,x:0,y:0}));
   const waiting=page.waitForEvent('download');await page.getByRole('button',{name:'Download data'}).click();
