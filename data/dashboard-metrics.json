@@ -1,0 +1,289 @@
+{
+  "communityDetection": [
+    {
+      "method": "Louvain",
+      "modularity": 0.4266,
+      "nmi": 0.5942,
+      "ari": 0.4905,
+      "communities": 4
+    },
+    {
+      "method": "Label Propagation",
+      "modularity": 0.3095,
+      "nmi": 0.3636,
+      "ari": 0.3833,
+      "communities": 3
+    },
+    {
+      "method": "Girvan-Newman",
+      "modularity": 0.3423,
+      "nmi": 0.6804,
+      "ari": 0.7212,
+      "communities": 3
+    },
+    {
+      "method": "Spectral Clustering",
+      "modularity": 0.2521,
+      "nmi": 0.2713,
+      "ari": 0.0604,
+      "communities": 3
+    }
+  ],
+  "influence": [
+    {
+      "strategy": "PageRank",
+      "meanReach": 0.3065,
+      "stdReach": 0.0713,
+      "seeds": [
+        33,
+        0,
+        32,
+        2,
+        1
+      ]
+    },
+    {
+      "strategy": "Betweenness",
+      "meanReach": 0.2971,
+      "stdReach": 0.0689,
+      "seeds": [
+        0,
+        33,
+        32,
+        2,
+        31
+      ]
+    },
+    {
+      "strategy": "Degree",
+      "meanReach": 0.3029,
+      "stdReach": 0.0601,
+      "seeds": [
+        33,
+        0,
+        32,
+        2,
+        1
+      ]
+    },
+    {
+      "strategy": "Random",
+      "meanReach": 0.2479,
+      "stdReach": 0.08,
+      "seeds": "random"
+    }
+  ],
+  "centralityTopNodes": [
+    {
+      "metric": "degree",
+      "nodes": [
+        {
+          "node": 33,
+          "value": 0.515152
+        },
+        {
+          "node": 0,
+          "value": 0.484848
+        },
+        {
+          "node": 32,
+          "value": 0.363636
+        },
+        {
+          "node": 2,
+          "value": 0.30303
+        },
+        {
+          "node": 1,
+          "value": 0.272727
+        },
+        {
+          "node": 31,
+          "value": 0.181818
+        },
+        {
+          "node": 3,
+          "value": 0.181818
+        },
+        {
+          "node": 8,
+          "value": 0.151515
+        }
+      ]
+    },
+    {
+      "metric": "betweenness",
+      "nodes": [
+        {
+          "node": 0,
+          "value": 0.437635
+        },
+        {
+          "node": 33,
+          "value": 0.304075
+        },
+        {
+          "node": 32,
+          "value": 0.145247
+        },
+        {
+          "node": 2,
+          "value": 0.143657
+        },
+        {
+          "node": 31,
+          "value": 0.138276
+        },
+        {
+          "node": 8,
+          "value": 0.055927
+        },
+        {
+          "node": 1,
+          "value": 0.053937
+        },
+        {
+          "node": 13,
+          "value": 0.045863
+        }
+      ]
+    },
+    {
+      "metric": "eigenvector",
+      "nodes": [
+        {
+          "node": 33,
+          "value": 0.373371
+        },
+        {
+          "node": 0,
+          "value": 0.355483
+        },
+        {
+          "node": 2,
+          "value": 0.317189
+        },
+        {
+          "node": 32,
+          "value": 0.308651
+        },
+        {
+          "node": 1,
+          "value": 0.265954
+        },
+        {
+          "node": 8,
+          "value": 0.227405
+        },
+        {
+          "node": 13,
+          "value": 0.22647
+        },
+        {
+          "node": 3,
+          "value": 0.211174
+        }
+      ]
+    },
+    {
+      "metric": "pagerank",
+      "nodes": [
+        {
+          "node": 33,
+          "value": 0.09698
+        },
+        {
+          "node": 0,
+          "value": 0.088508
+        },
+        {
+          "node": 32,
+          "value": 0.075926
+        },
+        {
+          "node": 2,
+          "value": 0.062767
+        },
+        {
+          "node": 1,
+          "value": 0.057415
+        },
+        {
+          "node": 31,
+          "value": 0.041985
+        },
+        {
+          "node": 23,
+          "value": 0.041146
+        },
+        {
+          "node": 3,
+          "value": 0.037212
+        }
+      ]
+    }
+  ],
+  "heuristicEvaluation": [
+    {
+      "method": "Common Neighbors",
+      "auc": 0.7292,
+      "averagePrecision": 0.7222
+    },
+    {
+      "method": "Jaccard Coefficient",
+      "auc": 0.5729,
+      "averagePrecision": 0.5045
+    },
+    {
+      "method": "Adamic-Adar",
+      "auc": 0.7326,
+      "averagePrecision": 0.7489
+    },
+    {
+      "method": "Preferential Attachment",
+      "auc": 0.7882,
+      "averagePrecision": 0.8243
+    }
+  ],
+  "supervisedModel": {
+    "testAuc": 0.6181,
+    "averagePrecision": 0.6023,
+    "cvMeanAuc": 0.8966,
+    "cvStdAuc": 0.0287,
+    "featureImportances": [
+      {
+        "feature": "clustering_u",
+        "importance": 0.328403
+      },
+      {
+        "feature": "pref_attachment",
+        "importance": 0.2236
+      },
+      {
+        "feature": "clustering_v",
+        "importance": 0.15674
+      },
+      {
+        "feature": "degree_v",
+        "importance": 0.154475
+      },
+      {
+        "feature": "degree_u",
+        "importance": 0.063555
+      },
+      {
+        "feature": "shortest_path",
+        "importance": 0.047811
+      },
+      {
+        "feature": "common_neighbors",
+        "importance": 0.025416
+      }
+    ]
+  },
+  "split": {
+    "trainEdges": 66,
+    "testPositiveEdges": 12,
+    "testNegativeEdges": 12
+  }
+}
