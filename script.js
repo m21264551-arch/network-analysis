@@ -76,6 +76,7 @@ function details(partition) {
   return `<h3>Node ${n.id}</h3><p>Reference group ${n.reference + 1} · ${view === "groups" ? `displayed group ${(partition[n.id] ?? n.reference) + 1}` : "inspect an activated node or a seed"}</p><dl><dt>Neighbours</dt><dd>${n.degree_count}</dd><dt>PageRank</dt><dd>${fmt(n.pagerank, 4)}</dd><dt>Betweenness</dt><dd>${fmt(n.betweenness, 4)}</dd><dt>Eigenvector</dt><dd>${fmt(n.eigenvector, 4)}</dd></dl><p class="muted">Degree counts immediate neighbours. PageRank rewards links from well-connected nodes. Betweenness measures how often a node lies on shortest paths. These answer different questions.</p>`;
 }
 function render() {
+  if (!data) return;
   $("#counts").textContent =
     `${data.nodes.length} nodes · ${data.edges.length} edges`;
   $("#description").textContent = data.description;
@@ -223,6 +224,7 @@ async function load() {
     $("#dataset").innerHTML = bundle.experiments
       .map((e) => `<option value="${e.id}">${e.name}</option>`)
       .join("");
+    document.querySelectorAll("[data-view]").forEach((button) => { button.disabled = false; });
     $("#dataset").disabled = false;
     $("#download").disabled = false;
     $("#status").textContent = "";
