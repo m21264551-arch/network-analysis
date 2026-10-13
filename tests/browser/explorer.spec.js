@@ -47,7 +47,7 @@ test("node keyboard inspection and contextual influence controls", async ({
     page.getByRole("heading", { name: "Node 33", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Influence" }).click();
-  await expect(page.getByLabel("Display groups")).toHaveCount(0);
+  await expect(page.getByLabel("Community method")).toHaveCount(0);
   await page.getByLabel("Propagation probability").selectOption("0.2");
   await page.getByRole("button", { name: "Next wave" }).click();
   await expect(page.getByText(/Wave 1/)).toBeVisible();
@@ -111,4 +111,43 @@ test("guide navigation keeps the current selection", async ({page})=>{
   await page.getByRole("link",{name:"Back to tool ↑"}).click();
   expect(new URL(page.url()).search).toBe("?source=portfolio");
   await expect(page.getByRole("combobox",{name:"Select node",exact:true})).toHaveValue("33");
+});
+
+test("node selection highlights neighbours without moving the graph", async ({page}) => {
+  await page.goto("/");
+  await page.getByRole("heading", {name:"Node 0",exact:true}).waitFor();
+  const positions = () => page.locator(".node circle:first-child").evaluateAll((nodes)=>nodes.map((n)=>[n.getAttribute("cx"),n.getAttribute("cy")]));
+  const before=await positions();
+  await page.getByRole("combobox",{name:"Select node",exact:true}).selectOption("33");
+  expect(await positions()).toEqual(before);
+  const adjacent = bundle.experiments[0].edges.filter((e)=>e.source===33||e.target===33);
+  await expect(page.locator('[data-incident="true"]')).toHaveCount(adjacent.length);
+  await expect(page.locator('.node[data-related="true"]')).toHaveCount(adjacent.length+1);
+  await page.getByLabel("Community method").selectOption("Girvan-Newman");
+  await page.getByRole("button", {name:"Reference groups",exact:true}).click();
+  await expect(page.getByLabel("Community method")).toBeDisabled();
+  expect(await positions()).toEqual(before);
+  await page.getByRole("button", {name:"Reference groups",exact:true}).click();
+  await expect(page.getByLabel("Community method")).toHaveValue("Girvan-Newman");
+});
+
+test("link illustration removes exactly the saved held-out edges", async ({page}) => {
+  await page.goto("/"); await page.getByRole("button", {name:"Link recovery",exact:true}).click();
+  const exp=bundle.experiments[0]; const split=exp.linkRuns[0];
+  await expect(page.locator('[data-kind="observed"]')).toHaveCount(split.trainEdges);
+  for(const [a,b] of split.positiveEdges) await expect(page.locator(`[data-kind="observed"][data-edge="${[a,b].sort((a,b)=>a-b).join(":")}"]`)).toHaveCount(0);
+  await page.getByRole("button",{name:"Show withheld links"}).click();
+  await expect(page.locator('[data-kind="withheld"]')).toHaveCount(split.positiveEdges.length);
+  await expect(page.locator('[data-kind="negative"]')).toHaveCount(1);
+  await page.getByRole("combobox",{name:"Split",exact:true}).selectOption("1");
+  await expect(page.locator('[data-kind="withheld"]')).toHaveCount(0);
+  await expect(page.locator('[data-kind="observed"]')).toHaveCount(exp.linkRuns[1].trainEdges);
+});
+
+for(const [width,height] of [[1280,720],[800,900],[390,844]]) test(`graph fits at ${width}px`,async({page})=>{
+ await page.setViewportSize({width,height}); await page.goto("/");
+ await page.getByRole("heading",{name:"Node 0",exact:true}).waitFor();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);
+ const box=await page.locator('.plot svg').boundingBox(); expect(box.y).toBeLessThan(height-200);
+ await page.screenshot({path:`../../outputs/refined-network-${width}.png`});
 });
