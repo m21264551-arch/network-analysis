@@ -1,621 +1,265 @@
-const views = {
-  overview: {
-    mode: "network",
-    kicker: "Interactive Graph Explorer",
-    title: "Karate Club Network",
-    insightTitle: "Hover nodes to inspect influence and community membership",
-    stats: [
-      ["Nodes", "34"],
-      ["Edges", "78"],
-      ["Communities", "4"],
-      ["Modularity", "0.4266"],
-    ],
-    copy:
-      "Graph data: JSON export with hover, filtering, and centrality-based node sizing.",
-    note: "Source: data/network-karate.json",
-    download: "data/network-karate.json",
-  },
-  communities: {
-    mode: "chart",
-    chart: "community",
-    kicker: "Community Detection",
-    title: "Algorithm Comparison",
-    insightTitle: "Modularity and NMI tell different stories",
-    stats: [
-      ["Best modularity", "0.4266"],
-      ["Highest NMI", "0.7324"],
-      ["Algorithms", "4"],
-      ["Best method", "Louvain"],
-    ],
-    copy:
-      "Compare modularity, NMI, and community count across detection algorithms.",
-    note: "Output: detector comparison",
-    download: "data/dashboard-metrics.json",
-  },
-  influence: {
-    mode: "chart",
-    chart: "influence",
-    kicker: "Influence Analysis",
-    title: "Seed Strategy Reach",
-    insightTitle: "Centrality choices change simulated reach",
-    stats: [
-      ["Seed size", "5"],
-      ["Simulations", "100"],
-      ["Propagation p", "0.10"],
-      ["Output", "Mean reach"],
-    ],
-    copy:
-      "Compare seed strategies by mean activated reach.",
-    note: "Output: influence spread",
-    download: "data/dashboard-metrics.json",
-  },
-  links: {
-    mode: "chart",
-    chart: "heuristics",
-    kicker: "Link Prediction",
-    title: "Heuristic Evaluation",
-    insightTitle: "Preferential attachment is the strongest heuristic",
-    stats: [
-      ["Best heuristic AUC", "0.7882"],
-      ["Best avg precision", "0.8243"],
-      ["Held-out positives", "12"],
-      ["Held-out negatives", "12"],
-    ],
-    copy:
-      "Compare AUC and average precision on held-out edges.",
-    note: "Best heuristic: Preferential Attachment, AUC 0.7882",
-    download: "data/dashboard-metrics.json",
-  },
-  methods: {
-    mode: "chart",
-    chart: "centrality",
-    kicker: "Centrality Methods",
-    title: "Top Centrality Nodes",
-    insightTitle: "Reusable modules make the work reviewable",
-    stats: [
-      ["Package", "src/*"],
-      ["CLI", "main.py"],
-      ["Notebook", "analysis.ipynb"],
-      ["Tests", "pytest"],
-    ],
-    copy:
-      "Source modules, CLI, notebook, generated figures, and tests.",
-    note: "Run: python main.py",
-    download: "data/dashboard-metrics.json",
-  },
-};
-
-const colors = ["#2f7d6d", "#2f66b3", "#d97834", "#8b6bd6", "#6b7280"];
-const tabButtons = document.querySelectorAll("[data-tab]");
-const mainKicker = document.querySelector("#main-kicker");
-const mainTitle = document.querySelector("#main-title");
-const mainImage = document.querySelector("#main-image");
-const mainChart = document.querySelector("#main-chart");
-const networkExplorer = document.querySelector("#network-explorer");
-const insightTitle = document.querySelector("#insight-title");
-const statList = document.querySelector("#stat-list");
-const insightCopy = document.querySelector("#insight-copy");
-const runNote = document.querySelector("#run-note");
-const downloadButton = document.querySelector("#download-current");
-const zoomButton = document.querySelector("#zoom-toggle");
-const primaryPanel = document.querySelector(".primary-panel");
-const svg = document.querySelector("#network-svg");
-const tooltip = document.querySelector("#node-tooltip");
-const communityFilter = document.querySelector("#community-filter");
-const sizeButtons = document.querySelectorAll("[data-size-metric]");
-
-let currentView = "overview";
-let graphData = null;
-let dashboardData = null;
-let sizeMetric = "pagerank";
-let activeCommunity = "all";
-
-function renderView(key) {
-  const view = views[key] || views.overview;
-  currentView = key;
-
-  tabButtons.forEach((button) => {
-    const active = button.dataset.tab === key;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-selected", String(active));
-  });
-
-  mainKicker.textContent = view.kicker;
-  mainTitle.textContent = view.title;
-  insightTitle.textContent = view.insightTitle;
-  insightCopy.textContent = view.copy;
-  runNote.textContent = view.note;
-
-  networkExplorer.classList.toggle("is-hidden", view.mode !== "network");
-  mainImage.classList.toggle("is-hidden", view.mode !== "image");
-  mainChart.classList.toggle("is-hidden", view.mode !== "chart");
-
-  if (view.mode === "image") {
-    mainImage.src = view.image;
-    mainImage.alt = view.alt;
-  } else if (view.mode === "network" && graphData) {
-    renderNetwork();
-  }
-  if (view.mode === "chart" && dashboardData) {
-    renderChart(mainChart, view.chart, true);
-  }
-
-  statList.innerHTML = view.stats
-    .map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`)
+const $ = (selector) => document.querySelector(selector);
+const colors = [
+  "#2e6749",
+  "#ad5b2a",
+  "#506aad",
+  "#8d477b",
+  "#807227",
+  "#476e76",
+  "#746554",
+  "#7245a1",
+];
+const symbols = ["●", "■", "▲", "◆", "✚", "○", "□", "△"];
+const fmt = (n, d = 3) => (Number.isFinite(n) ? n.toFixed(d) : "Unavailable");
+const pct = (n) => `${fmt(n * 100, 1)}%`;
+let bundle,
+  data,
+  view = "groups",
+  method = "Louvain",
+  size = "pagerank",
+  selected = 0,
+  probability = 0.1,
+  count = 3,
+  strategy = "PageRank",
+  frame = 0;
+function validate(value) {
+  if (
+    value.schemaVersion !== 1 ||
+    !Array.isArray(value.experiments) ||
+    value.experiments.length !== 3
+  )
+    throw Error("Unsupported or incomplete experiment bundle.");
+  for (const e of value.experiments)
+    if (
+      !e.nodes?.length ||
+      !e.edges?.length ||
+      e.communities?.length !== 4 ||
+      e.linkRuns?.length !== 20 ||
+      !e.influence?.length
+    )
+      throw Error("The experiment bundle is incomplete.");
+  return value;
+}
+const table = (heads, rows) =>
+  `<div class="table-wrap" tabindex="0" role="region" aria-label="${heads[0]} results"><table><thead><tr>${heads.map((x) => `<th scope="col">${x}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((x) => `<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+const options = (items, value) =>
+  items
+    .map(
+      (x) =>
+        `<option ${String(x) === String(value) ? "selected" : ""}>${x}</option>`,
+    )
     .join("");
+function graph(partition, active = null, seeds = []) {
+  const pos = (n) => ({ x: 55 + (n.x + 1) * 285, y: 45 + (n.y + 1) * 230 });
+  const nodeMap = new Map(data.nodes.map((n) => [n.id, n]));
+  const max = Math.max(...data.nodes.map((n) => n[size]));
+  const edges = data.edges
+    .map((e) => {
+      const a = pos(nodeMap.get(e.source)),
+        b = pos(nodeMap.get(e.target));
+      return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#cbd6c9" stroke-width="1.3"/>`;
+    })
+    .join("");
+  const nodes = data.nodes
+    .map((n) => {
+      const p = pos(n),
+        group = partition[n.id] ?? n.reference,
+        r = 8 + Math.sqrt(n[size] / max) * 9;
+      const on = active === null || active.has(n.id);
+      return `<g class="node" role="button" tabindex="0" data-node="${n.id}" aria-label="Inspect node ${n.id}, group ${group + 1}, ${n.degree_count} neighbours" aria-pressed="${n.id === selected}"><circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${on ? colors[group % colors.length] : "#fff"}" stroke="${n.id === selected ? "#152a1c" : colors[group % colors.length]}" stroke-width="${n.id === selected ? 4 : 1.5}"/><text x="${p.x}" y="${p.y + 4}" text-anchor="middle" font-size="10" font-weight="700" fill="${on ? "#fff" : "#24362d"}">${n.id}</text>${seeds.includes(n.id) ? `<circle cx="${p.x}" cy="${p.y}" r="${r + 5}" fill="none" stroke="#1d3927" stroke-dasharray="3 2"/>` : ""}</g>`;
+    })
+    .join("");
+  return `<figure class="plot"><svg viewBox="0 0 680 540" aria-label="${data.name} graph, select a numbered node to inspect its position" role="group">${edges}${nodes}</svg><figcaption>Edges are unweighted. Node numbers identify individuals or synthetic nodes. ${active ? "Filled nodes are active; dashed rings identify seeds." : "Colour indicates group; numeric group labels appear in node details."} Positions are fixed across comparisons.</figcaption></figure>`;
 }
-
-function renderAllCharts() {
-  if (!dashboardData) return;
-  document.querySelectorAll("[data-chart]").forEach((container) => {
-    renderChart(container, container.dataset.chart, false);
-  });
-  if (views[currentView]?.mode === "chart") {
-    renderChart(mainChart, views[currentView].chart, true);
-  }
+function details(partition) {
+  const n = data.nodes.find((n) => n.id === selected) ?? data.nodes[0];
+  return `<h3>Node ${n.id}</h3><p>Reference group ${n.reference + 1} · ${view === "groups" ? `displayed group ${(partition[n.id] ?? n.reference) + 1}` : "inspect an activated node or a seed"}</p><dl><dt>Neighbours</dt><dd>${n.degree_count}</dd><dt>PageRank</dt><dd>${fmt(n.pagerank, 4)}</dd><dt>Betweenness</dt><dd>${fmt(n.betweenness, 4)}</dd><dt>Eigenvector</dt><dd>${fmt(n.eigenvector, 4)}</dd></dl><p class="muted">Degree counts immediate neighbours. PageRank rewards links from well-connected nodes. Betweenness measures how often a node lies on shortest paths. These answer different questions.</p>`;
 }
-
-function renderChart(container, key, large = false) {
-  const title = {
-    community: "Community Detection Metrics",
-    influence: "Influence Reach by Seed Strategy",
-    heuristics: "Link Prediction Heuristic Evaluation",
-    features: "Supervised Model Feature Importance",
-    centrality: "Top Nodes by PageRank",
-  }[key];
-  container.innerHTML = `<div class="chart-title">${title}</div>`;
-
-  if (key === "community") {
-    container.append(renderGroupedBars(
-      dashboardData.communityDetection,
-      "method",
+function render() {
+  $("#counts").textContent =
+    `${data.nodes.length} nodes · ${data.edges.length} edges`;
+  $("#description").textContent = data.description;
+  document
+    .querySelectorAll("[data-view]")
+    .forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === view));
+  const partition =
+    method === "Reference groups"
+      ? Object.fromEntries(data.nodes.map((n) => [n.id, n.reference]))
+      : data.communities.find((c) => c.method === method).partition;
+  let content = "";
+  if (view === "groups") {
+    const best = [...data.communities].sort((a, b) => b.nmi - a.nmi)[0];
+    content = `<div class="experiment"><section><div class="controls"><label>Display groups<select id="method">${options(["Reference groups", ...data.communities.map((c) => c.method)], method)}</select></label><label>Size nodes by<select id="size">${options(["pagerank", "degree", "betweenness"], size)}</select></label></div>${graph(partition)}</section><aside><h2>Do the groups agree?</h2><p>Compare a partition with the observed split or planted labels. A visually convincing cluster is not necessarily the reference group.</p><div class="note">${best.method} has the highest label agreement here: NMI ${fmt(best.nmi)}. This is one fixed graph, not a universal ranking.</div>${details(partition)}</aside></div><h3>Partition comparison</h3>${table(
+      ["Method", "Groups", "Modularity", "NMI ↑", "Adjusted Rand ↑"],
+      data.communities.map((c) => [
+        c.method,
+        c.num_communities,
+        fmt(c.modularity),
+        fmt(c.nmi),
+        fmt(c.ari),
+      ]),
+    )}<p class="muted">Modularity measures dense internal connections relative to a null model; NMI and adjusted Rand compare against reference labels. Spectral clustering and Girvan–Newman are given the known number of groups. Louvain and label propagation choose their own partition; this is not an equal-information contest.</p>`;
+  } else if (view === "influence") {
+    const rows = data.influence.filter(
+        (r) => r.seedCount === count && r.probability === probability,
+      ),
+      chosen = rows.find((r) => r.strategy === strategy);
+    frame = Math.min(frame, chosen.replay.length - 1);
+    const active = new Set(chosen.replay.slice(0, frame + 1).flat()),
+      same = rows
+        .filter(
+          (r) =>
+            r.strategy !== strategy &&
+            [...r.seeds].sort().join() === [...chosen.seeds].sort().join(),
+        )
+        .map((r) => r.strategy);
+    content = `<div class="experiment"><section><div class="controls"><label>Seed strategy<select id="strategy">${options(
+      rows.map((r) => r.strategy),
+      strategy,
+    )}</select></label><label>Seed count<select id="count">${options([1, 3, 5], count)}</select></label><label>Propagation probability<select id="probability">${options([0.05, 0.1, 0.2], probability)}</select></label></div>${graph(Object.fromEntries(data.nodes.map((n) => [n.id, n.reference])), active, chosen.seeds)}<div class="controls"><button id="restart">Restart replay</button><button id="step" ${frame === chosen.replay.length - 1 ? "disabled" : ""}>Next wave →</button><span>Wave ${frame} · ${active.size} active nodes</span></div></section><aside><h2>Where should spread begin?</h2><p>Each active node has one independent chance to activate each neighbour. This is an assumption about diffusion, not a measurement of human behaviour.</p><p>Seeds: <strong>${chosen.seeds.join(", ")}</strong></p><div class="note">${same.length ? `${same.join(" and ")} selects the same seed set. Paired trials must therefore give the same reach.` : `${strategy} reaches ${pct(chosen.mean)} on average across ${chosen.reaches.length} paired trials. The replay shows trial 0, not the average.`}</div>${details(partition)}</aside></div><h3>Reach across the same random worlds</h3><div class="bars">${rows.map((r) => `<div class="bar-row"><span>${r.strategy}</span><div class="track"><div class="fill" style="width:${r.mean * 100}%"></div><div class="spread" style="left:${Math.max(0, r.mean - r.std) * 100}%;width:${(Math.min(1, r.mean + r.std) - Math.max(0, r.mean - r.std)) * 100}%"></div></div><span>${pct(r.mean)}</span></div>`).join("")}</div>${table(
+      ["Strategy", "Mean reach", "SD of reach", "Seeds"],
+      rows.map((r) => [
+        r.strategy,
+        pct(r.mean),
+        pct(r.std),
+        r.seeds.join(", "),
+      ]),
+    )}<p class="muted">Dark bars show ±1 standard deviation, not confidence intervals. Random chooses one fixed seed set; trials vary propagation only. Shared live-edge worlds make strategy comparisons paired.</p>`;
+  } else if (view === "links") {
+    const best = [...data.linkComparison].sort(
+        (a, b) => b.aucMean - a.aucMean,
+      )[0],
+      ml = data.linkComparison.find((r) => r.method === "Gradient Boosting");
+    content = `<h2>Does a learned model recover more missing links?</h2><p>Remove edges, rebuild every graph feature, and score balanced held-out edges and true non-edges. Repeat across ${data.linkRuns.length} seeded splits on this graph.</p><div class="note">${best.method} leads at mean ROC-AUC ${fmt(best.aucMean)}. Gradient Boosting scores ${fmt(ml.aucMean)}${ml.aucMean < best.aucMean ? " — additional model complexity did not improve the mean result." : "."} Variation between splits matters more than any single run.</div>${table(
       [
-        ["modularity", "Modularity", "#2f7d6d"],
-        ["nmi", "NMI", "#2f66b3"],
+        "Method",
+        "Mean ROC-AUC ↑",
+        "SD",
+        "Average precision ↑",
+        "ROC-AUC across splits",
       ],
-      large,
-    ));
-  }
-  if (key === "influence") {
-    container.append(renderSingleBars(
-      dashboardData.influence,
-      "strategy",
-      "meanReach",
-      { color: "#2f7d6d", suffix: "%", scale: 100, large },
-    ));
-  }
-  if (key === "heuristics") {
-    container.append(renderGroupedBars(
-      dashboardData.heuristicEvaluation,
-      "method",
+      data.linkComparison.map((r) => [
+        r.method,
+        fmt(r.aucMean),
+        fmt(r.aucStd),
+        fmt(r.apMean),
+        `<svg class="score-range" viewBox="0 0 210 35" role="img" aria-label="AUC ranges from ${fmt(Math.min(...r.aucValues))} to ${fmt(Math.max(...r.aucValues))}"><line x1="5" y1="18" x2="205" y2="18" stroke="#bdcab8"/><line x1="105" y1="6" x2="105" y2="30" stroke="#687b65" stroke-dasharray="2 2"/>${r.aucValues.map((x, i) => `<circle cx="${5 + x * 200}" cy="${10 + (i % 3) * 7}" r="3" fill="#315b41"/>`).join("")}</svg>`,
+      ]),
+    )}<p class="muted">Dot plots run from 0 to 1; dashed line marks AUC 0.5. Each dot is an outer split, not an independent dataset. Splits preserve connectivity, so bridge edges are never held out. Balanced negatives simplify the task; precision does not represent the natural rate of missing links.</p><details><summary>Inspect the exact split sizes</summary>${table(
       [
-        ["auc", "AUC", "#2f7d6d"],
-        ["averagePrecision", "Avg precision", "#d97834"],
+        "Split seed",
+        "Training edges",
+        "Positive test edges",
+        "Negative test pairs",
       ],
-      large,
-    ));
-    const best = [...dashboardData.heuristicEvaluation].sort((a, b) => b.auc - a.auc)[0];
-    container.append(renderCaption(`Best by AUC: ${best.method} (${best.auc.toFixed(4)}).`));
+      data.linkRuns.map((r) => [
+        r.seed,
+        r.trainEdges,
+        r.positiveEdges.length,
+        r.negativeEdges.length,
+      ]),
+    )}</details>`;
+  } else {
+    content = `<section class="method"><h2>A saved experiment you can reproduce</h2><p>This page is a static explorer. Python generates the graph, partitions, centrality scores, propagation trials and link-recovery metrics together. Changing controls selects a saved experiment; it does not train a model in your browser.</p><h3>Graphs and reference labels</h3><p>Karate Club uses Zachary's observed network and subsequent two-group split. The stochastic block models plant four groups of 20 nodes. Strong separation uses p(within)=0.30 and p(between)=0.015; weak separation uses 0.18 and 0.08. All graphs are unweighted, undirected and generated/layout-seeded with 42.</p><h3>Community detection</h3><p>Louvain optimizes modularity. Label propagation follows neighbours' labels. Girvan–Newman removes high-betweenness edges and stops at the known group count. Spectral clustering uses Laplacian eigenvectors with the known group count. Agreement with labels and internal density are distinct criteria.</p><h3>Link recovery</h3><p>Twenty outer splits hold out about 15% of edges while preserving connectivity. Test negatives are true non-edges, disjoint from training negatives. All topology features are rebuilt on the remaining graph. When extracting a positive training pair, that pair's own edge is temporarily removed. Endpoint features use min/max to respect an undirected graph. Fixed Gradient Boosting settings: 200 estimators, depth 3, learning rate 0.05. No row-wise cross-validation over cached graph features is claimed.</p><h3>Influence</h3><p>Independent Cascade uses common directed live-edge worlds across strategies. One fixed set of randomly selected seeds is included as a baseline. One hundred seeded propagation trials per configuration estimate variability, not real social contagion.</p><h3>Reproduce</h3><code>python main.py --export-dashboard data/experiments.json<br>python -m pytest<br>python -m http.server 8080</code><p>Download the bundle for graph coordinates, each partition, exact held-out pairs, per-split scores, every trial's reach and a deterministic replay.</p><h3>Limitations</h3><p>These are three small graphs. Repeated splits share the same underlying topology and are not independent evidence across populations. Connectivity-preserving removal biases the missing-link task. Synthetic groups are planted by construction. A method's performance here cannot establish a general winner.</p><p><a href="https://networkx.org/documentation/stable/reference/generated/networkx.generators.social.karate_club_graph.html">Karate Club source and citation</a> · <a href="https://github.com/m21264551-arch/network-analysis">Full source and setup</a></p></section>`;
   }
-  if (key === "features") {
-    container.append(renderHorizontalBars(
-      dashboardData.supervisedModel.featureImportances,
-      "feature",
-      "importance",
-      { color: "#2f7d6d", large },
-    ));
-  }
-  if (key === "centrality") {
-    const pagerank = dashboardData.centralityTopNodes.find((item) => item.metric === "pagerank");
-    container.append(renderHorizontalBars(
-      pagerank.nodes.map((node) => ({ label: `Node ${node.node}`, value: node.value })),
-      "label",
-      "value",
-      { color: "#2f66b3", large },
-    ));
-  }
-}
-
-function chartSvg({ width, height, large = false } = {}) {
-  const chartWidth = width ?? (large ? 680 : 520);
-  const chartHeight = height ?? (large ? 520 : 260);
-  const svgEl = createSvg("svg", {
-    class: `chart-svg${large ? " is-large" : ""}`,
-    viewBox: `0 0 ${chartWidth} ${chartHeight}`,
-    role: "img",
-  });
-  return { svgEl, width: chartWidth, height: chartHeight };
-}
-
-function renderGroupedBars(rows, labelKey, series, large = false) {
-  const { svgEl, width, height } = chartSvg({ large });
-  const margin = { top: 18, right: 18, bottom: large ? 74 : 58, left: 42 };
-  const chartW = width - margin.left - margin.right;
-  const chartH = height - margin.top - margin.bottom;
-  const max = Math.max(1, ...rows.flatMap((row) => series.map(([key]) => row[key])));
-  const groupW = chartW / rows.length;
-  const barW = Math.min(28, (groupW - 18) / series.length);
-
-  svgEl.append(...gridLines(width, margin, chartH, max));
-  rows.forEach((row, rowIndex) => {
-    const groupX = margin.left + rowIndex * groupW + groupW / 2;
-    series.forEach(([key, label, color], seriesIndex) => {
-      const value = row[key];
-      const h = (value / max) * chartH;
-      const x = groupX - ((series.length * barW) / 2) + seriesIndex * barW;
-      const y = margin.top + chartH - h;
-      svgEl.append(barRect({ x, y, width: barW - 3, height: h, color, label: `${row[labelKey]} ${label}: ${value.toFixed(4)}` }));
-    });
-    svgEl.append(axisLabel(groupX, margin.top + chartH + 18, compactLabel(row[labelKey]), large));
-  });
-  svgEl.append(renderLegend(series.map(([, label, color]) => ({ label, color })), width - margin.right, 12));
-  return svgEl;
-}
-
-function renderSingleBars(rows, labelKey, valueKey, options) {
-  const { color, suffix = "", scale = 1, large = false } = options;
-  const { svgEl, width, height } = chartSvg({ large });
-  const margin = { top: 18, right: 18, bottom: large ? 74 : 56, left: 42 };
-  const chartW = width - margin.left - margin.right;
-  const chartH = height - margin.top - margin.bottom;
-  const max = Math.max(...rows.map((row) => row[valueKey]));
-  const groupW = chartW / rows.length;
-  const barW = Math.min(46, groupW * 0.48);
-
-  svgEl.append(...gridLines(width, margin, chartH, max));
-  rows.forEach((row, index) => {
-    const value = row[valueKey];
-    const h = (value / max) * chartH;
-    const x = margin.left + index * groupW + (groupW - barW) / 2;
-    const y = margin.top + chartH - h;
-    svgEl.append(barRect({ x, y, width: barW, height: h, color, label: `${row[labelKey]}: ${(value * scale).toFixed(1)}${suffix}` }));
-    svgEl.append(axisLabel(x + barW / 2, margin.top + chartH + 18, compactLabel(row[labelKey]), large));
-    svgEl.append(valueLabel(x + barW / 2, y - 7, `${(value * scale).toFixed(1)}${suffix}`));
-  });
-  return svgEl;
-}
-
-function renderHorizontalBars(rows, labelKey, valueKey, options) {
-  const { color, large = false } = options;
-  const { svgEl, width, height } = chartSvg({ large });
-  const margin = { top: 18, right: 24, bottom: 18, left: large ? 140 : 116 };
-  const chartW = width - margin.left - margin.right;
-  const rowH = (height - margin.top - margin.bottom) / rows.length;
-  const max = Math.max(...rows.map((row) => row[valueKey]));
-
-  rows.forEach((row, index) => {
-    const y = margin.top + index * rowH + rowH * 0.18;
-    const w = (row[valueKey] / max) * chartW;
-    svgEl.append(axisText(margin.left - 10, y + rowH * 0.35, compactLabel(row[labelKey]), "end"));
-    svgEl.append(barRect({ x: margin.left, y, width: w, height: rowH * 0.5, color, label: `${row[labelKey]}: ${row[valueKey].toFixed(4)}` }));
-    svgEl.append(valueLabel(margin.left + w + 8, y + rowH * 0.35 + 4, row[valueKey].toFixed(3), "start"));
-  });
-  return svgEl;
-}
-
-function gridLines(width, margin, chartH, max) {
-  return [0, 0.5, 1].map((tick) => {
-    const y = margin.top + chartH - tick * chartH;
-    const line = createSvg("line", {
-      class: "chart-grid-line",
-      x1: margin.left,
-      x2: width - margin.right,
-      y1: y,
-      y2: y,
-    });
-    const label = axisText(margin.left - 8, y + 4, (tick * max).toFixed(max <= 1 ? 1 : 0), "end");
-    const group = createSvg("g");
-    group.append(line, label);
-    return group;
-  });
-}
-
-function barRect({ x, y, width, height, color, label }) {
-  const rect = createSvg("rect", {
-    class: "chart-bar",
-    x,
-    y,
-    width: Math.max(1, width),
-    height: Math.max(1, height),
-    rx: 4,
-    fill: color,
-    tabindex: 0,
-  });
-  rect.append(createSvg("title", {}, label));
-  return rect;
-}
-
-function renderLegend(items, rightX, y) {
-  const group = createSvg("g", { class: "chart-legend" });
-  const swatchWidth = 9;
-  const labelGap = 14;
-  const itemGap = 24;
-  const charWidth = 9.6;
-  const itemWidths = items.map((item) => swatchWidth + labelGap + item.label.length * charWidth);
-  const totalWidth = itemWidths.reduce((sum, width) => sum + width, 0) + itemGap * (items.length - 1);
-  let cursor = Math.max(46, rightX - totalWidth);
-
-  items.forEach((item, index) => {
-    group.append(createSvg("rect", { x: cursor, y, width: swatchWidth, height: 9, rx: 2, fill: item.color }));
-    group.append(axisText(cursor + labelGap, y + 9, item.label, "start"));
-    cursor += itemWidths[index] + itemGap;
-  });
-  return group;
-}
-
-function axisLabel(x, y, text, large) {
-  const label = axisText(x, y, text, "middle");
-  if (large) label.setAttribute("font-size", "13");
-  return label;
-}
-
-function axisText(x, y, text, anchor = "middle") {
-  return createSvg("text", {
-    class: "chart-axis-text",
-    x,
-    y,
-    "text-anchor": anchor,
-  }, text);
-}
-
-function valueLabel(x, y, text, anchor = "middle") {
-  return createSvg("text", {
-    class: "chart-value-text",
-    x,
-    y,
-    "text-anchor": anchor,
-  }, text);
-}
-
-function renderCaption(text) {
-  const caption = document.createElement("p");
-  caption.className = "chart-caption";
-  caption.textContent = text;
-  return caption;
-}
-
-function compactLabel(value) {
-  const map = {
-    "Label Propagation": "Label Prop.",
-    "Spectral Clustering": "Spectral",
-    "Jaccard Coefficient": "Jaccard",
-    "Preferential Attachment": "Pref. Attach.",
-    "Common Neighbors": "Common N.",
-  };
-  return map[value] || value;
-}
-
-function metricValue(node) {
-  if (sizeMetric === "degree") return node.degree;
-  if (sizeMetric === "betweenness") return node.betweenness;
-  return node.pagerank;
-}
-
-function radiusScale(nodes) {
-  const values = nodes.map(metricValue);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  return (node) => {
-    if (max === min) return 10;
-    return 5 + ((metricValue(node) - min) / (max - min)) * 18;
-  };
-}
-
-function transformNodes(nodes) {
-  const width = 1000;
-  const height = 520;
-  const margin = 58;
-  const xs = nodes.map((node) => node.x);
-  const ys = nodes.map((node) => node.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-
-  return nodes.map((node) => ({
-    ...node,
-    sx: margin + ((node.x - minX) / (maxX - minX || 1)) * (width - margin * 2),
-    sy: margin + ((node.y - minY) / (maxY - minY || 1)) * (height - margin * 2),
-  }));
-}
-
-function renderCommunityControls() {
-  const communities = [...new Set(graphData.nodes.map((node) => node.community))].sort(
-    (a, b) => a - b,
-  );
-  communityFilter.innerHTML = [
-    `<button class="${activeCommunity === "all" ? "is-active" : ""}" type="button" data-community="all">All</button>`,
-    ...communities.map(
-      (community) =>
-        `<button class="${String(activeCommunity) === String(community) ? "is-active" : ""}" type="button" data-community="${community}">C${community}</button>`,
-    ),
-  ].join("");
-}
-
-function renderNetwork() {
-  if (!graphData) return;
-
-  const nodes = transformNodes(graphData.nodes);
-  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-  const radius = radiusScale(nodes);
-  const activeNodes = new Set(
-    nodes
-      .filter((node) => activeCommunity === "all" || String(node.community) === String(activeCommunity))
-      .map((node) => node.id),
-  );
-  const topNodes = new Set(
-    [...nodes].sort((a, b) => b.pagerank - a.pagerank).slice(0, 6).map((node) => node.id),
-  );
-
-  svg.setAttribute("viewBox", "0 0 1000 520");
-  svg.innerHTML = "";
-
-  const edgeGroup = createSvg("g", { class: "edge-layer" });
-  graphData.edges.forEach((edge) => {
-    const source = nodeMap.get(edge.source);
-    const target = nodeMap.get(edge.target);
-    const hidden = !activeNodes.has(source.id) || !activeNodes.has(target.id);
-    edgeGroup.append(
-      createSvg("line", {
-        class: `network-edge${hidden ? " is-dim" : ""}`,
-        x1: source.sx,
-        y1: source.sy,
-        x2: target.sx,
-        y2: target.sy,
-        "data-source": source.id,
-        "data-target": target.id,
-      }),
-    );
-  });
-
-  const nodeGroup = createSvg("g", { class: "node-layer" });
-  nodes.forEach((node) => {
-    const hidden = !activeNodes.has(node.id);
-    const circle = createSvg("circle", {
-      class: `network-node${hidden ? " is-dim" : ""}`,
-      cx: node.sx,
-      cy: node.sy,
-      r: radius(node).toFixed(2),
-      fill: colors[node.community % colors.length],
-      tabindex: 0,
-      role: "button",
-      "aria-label": `Node ${node.id}, community ${node.community}, PageRank ${node.pagerank}`,
-      "data-node": node.id,
-    });
-    circle.addEventListener("pointerenter", (event) => showNode(node, event));
-    circle.addEventListener("pointermove", (event) => positionTooltip(event));
-    circle.addEventListener("pointerleave", clearNode);
-    circle.addEventListener("click", (event) => showNode(node, event));
-    circle.addEventListener("focus", (event) => showNode(node, event));
-    circle.addEventListener("blur", clearNode);
-    circle.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        showNode(node, event);
+  $("#workspace").innerHTML = content;
+  document.querySelectorAll("[data-node]").forEach((el) => {
+    const choose = () => {
+      selected = Number(el.dataset.node);
+      render();
+      document.querySelector(`[data-node="${selected}"]`)?.focus();
+    };
+    el.onclick = choose;
+    el.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        choose();
       }
-    });
-    nodeGroup.append(circle);
-
-    if (topNodes.has(node.id)) {
-      nodeGroup.append(
-        createSvg("text", {
-          class: "network-label",
-          x: node.sx + radius(node) + 5,
-          y: node.sy + 4,
-        }, String(node.id)),
-      );
-    }
+    };
   });
-
-  svg.append(edgeGroup, nodeGroup);
-  renderCommunityControls();
+  for (const [id, update] of Object.entries({
+    method: (v) => (method = v),
+    size: (v) => (size = v),
+    count: (v) => {
+      count = +v;
+      frame = 0;
+    },
+    probability: (v) => {
+      probability = +v;
+      frame = 0;
+    },
+    strategy: (v) => {
+      strategy = v;
+      frame = 0;
+    },
+  })) {
+    const el = $(`#${id}`);
+    if (el)
+      el.onchange = () => {
+        update(el.value);
+        render();
+        $(`#${id}`).focus();
+      };
+  }
+  if ($("#step"))
+    $("#step").onclick = () => {
+      frame++;
+      render();
+      $("#step").focus();
+    };
+  if ($("#restart"))
+    $("#restart").onclick = () => {
+      frame = 0;
+      render();
+      $("#restart").focus();
+    };
 }
-
-function createSvg(tag, attrs = {}, text = "") {
-  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
-  Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
-  if (text) el.textContent = text;
-  return el;
+async function load() {
+  try {
+    const response = await fetch("data/experiments.json");
+    if (!response.ok) throw Error(`HTTP ${response.status}`);
+    bundle = validate(await response.json());
+    data = bundle.experiments[0];
+    $("#dataset").innerHTML = bundle.experiments
+      .map((e) => `<option value="${e.id}">${e.name}</option>`)
+      .join("");
+    $("#dataset").disabled = false;
+    $("#download").disabled = false;
+    $("#status").textContent = "";
+    $("#workspace").hidden = false;
+    $("#provenance").textContent =
+      `Saved experiment · generated ${bundle.generatedAt.slice(0, 10)} · code ${bundle.codeRevision.slice(0, 8)} · source SHA256 ${bundle.sourceChecksum}`;
+    render();
+  } catch (error) {
+    $("#status").innerHTML =
+      `<p>Experiment unavailable. The data could not be loaded or validated.</p><button id="retry">Try again</button> <a href="https://github.com/m21264551-arch/network-analysis">Open source and reproduction instructions</a>`;
+    $("#retry").onclick = load;
+    console.error(error);
+  }
 }
-
-function connectedNodeIds(nodeId) {
-  const ids = new Set([nodeId]);
-  graphData.edges.forEach((edge) => {
-    if (edge.source === nodeId) ids.add(edge.target);
-    if (edge.target === nodeId) ids.add(edge.source);
-  });
-  return ids;
-}
-
-function showNode(node, event) {
-  const connected = connectedNodeIds(node.id);
-  svg.querySelectorAll(".network-node").forEach((circle) => {
-    const id = Number(circle.dataset.node);
-    circle.classList.toggle("is-active", id === node.id);
-    circle.classList.toggle("is-dim", !connected.has(id));
-  });
-  svg.querySelectorAll(".network-edge").forEach((line) => {
-    const source = Number(line.dataset.source);
-    const target = Number(line.dataset.target);
-    const active = source === node.id || target === node.id;
-    line.classList.toggle("is-dim", !active);
-  });
-
-  tooltip.hidden = false;
-  tooltip.innerHTML = `
-    <strong>Node ${node.id}</strong>
-    <span><em>Community</em><b>${node.community}</b></span>
-    <span><em>Degree</em><b>${node.degree}</b></span>
-    <span><em>PageRank</em><b>${node.pagerank.toFixed(4)}</b></span>
-    <span><em>Betweenness</em><b>${node.betweenness.toFixed(4)}</b></span>
-  `;
-  positionTooltip(event);
-}
-
-function positionTooltip(event) {
-  const bounds = document.querySelector(".network-stage").getBoundingClientRect();
-  const clientX = Number.isFinite(event.clientX) ? event.clientX : bounds.left + bounds.width / 2;
-  const clientY = Number.isFinite(event.clientY) ? event.clientY : bounds.top + bounds.height / 2;
-  const x = Math.min(clientX - bounds.left + 16, bounds.width - 230);
-  const y = Math.max(clientY - bounds.top - 20, 12);
-  tooltip.style.left = `${Math.max(12, x)}px`;
-  tooltip.style.top = `${y}px`;
-}
-
-function clearNode() {
-  tooltip.hidden = true;
-  svg.querySelectorAll(".network-node, .network-edge").forEach((el) => {
-    el.classList.remove("is-active", "is-dim");
-  });
-  if (activeCommunity !== "all") renderNetwork();
-}
-
-tabButtons.forEach((button) => {
-  button.addEventListener("click", () => renderView(button.dataset.tab));
-});
-
-sizeButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    sizeMetric = button.dataset.sizeMetric;
-    sizeButtons.forEach((item) => item.classList.toggle("is-active", item === button));
-    renderNetwork();
-  });
-});
-
-communityFilter.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-community]");
-  if (!button) return;
-  activeCommunity = button.dataset.community;
-  renderNetwork();
-});
-
-downloadButton.addEventListener("click", () => {
-  const asset = views[currentView].download;
+$("#dataset").onchange = () => {
+  data = bundle.experiments.find((e) => e.id === $("#dataset").value);
+  selected = 0;
+  frame = 0;
+  render();
+};
+document.querySelectorAll("[data-view]").forEach(
+  (b) =>
+    (b.onclick = () => {
+      view = b.dataset.view;
+      render();
+    }),
+);
+$("#download").onclick = () => {
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify({ ...bundle, experiments: [data] }, null, 2)], {
+      type: "application/json",
+    }),
+  );
   const link = document.createElement("a");
-  link.href = asset;
-  link.download = asset.split("/").pop();
+  link.href = url;
+  link.download = `network-${data.id}-v1.json`;
   link.click();
-});
-
-zoomButton.addEventListener("click", () => {
-  const expanded = primaryPanel.classList.toggle("is-expanded");
-  zoomButton.title = expanded ? "Collapse panel" : "Expand panel";
-  if (graphData && views[currentView].mode === "network") renderNetwork();
-});
-
-Promise.all([
-  fetch("data/network-karate.json").then((response) => response.json()),
-  fetch("data/dashboard-metrics.json").then((response) => response.json()),
-])
-  .then(([networkPayload, metricsPayload]) => {
-    graphData = networkPayload;
-    dashboardData = metricsPayload;
-    renderAllCharts();
-    renderView("overview");
-  })
-  .catch(() => {
-    networkExplorer.classList.add("is-hidden");
-    mainImage.src = mainImage.dataset.fallbackSrc;
-    mainImage.classList.remove("is-hidden");
-    renderView("communities");
-  });
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+load();

@@ -221,7 +221,12 @@ def cli():
     parser.add_argument("--propagation-prob", type=float, default=0.1)
     parser.add_argument("--seed-size", type=int, default=5)
     parser.add_argument("--simulations", type=int, default=100)
+    parser.add_argument("--export-dashboard", type=str, help="Export all three curated experiments to a JSON file")
     args = parser.parse_args()
+    if args.export_dashboard:
+        from src.experiments import export_dashboard
+        export_dashboard(args.export_dashboard)
+        return
     main(
         dataset=args.dataset,
         n_nodes=args.nodes,
