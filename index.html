@@ -7,40 +7,38 @@
       name="description"
       content="Reproducible experiments in graph communities, simulated influence and missing-link recovery."
     />
-    <title>Network Structure Explorer</title>
+    <title>Network Explorer</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header>
-      <a href="/">Network Structure Explorer</a>
+      <a href="/">Network Explorer</a>
       <nav aria-label="External links">
-        <a href="https://github.com/m21264551-arch/network-analysis"
-          >Code &amp; method ↗</a
+        <a href="https://github.com/m21264551-arch/network-analysis">Code ↗</a
         ><a href="https://m21264551.com">Portfolio ↗</a>
       </nav>
     </header>
     <main>
-      <p class="eyebrow">Three graphs · one experimental protocol</p>
-      <h1>A network changes what<br />“important” means.</h1>
-      <p class="intro">
-        How do groups and node position affect influence and missing-link
-        recovery? Inspect a small social network, then test the same methods on
-        two controlled synthetic graphs.
-      </p>
+      <h1>Explore communities, influence, and missing links.</h1>
       <div class="dataset">
         <label for="dataset">Dataset</label
         ><select id="dataset" disabled></select
         ><span id="counts"></span
-        ><button id="download" disabled>Download experiment ↓</button>
+        ><button id="download" disabled>Download data ↓</button>
       </div>
       <p id="description"></p>
       <nav id="views" aria-label="Experiments">
-        <button disabled data-view="groups" aria-pressed="true">01 Groups</button
-        ><button disabled data-view="influence" aria-pressed="false">02 Influence</button
-        ><button disabled data-view="links" aria-pressed="false">03 Missing links</button
-        ><button disabled data-view="method" aria-pressed="false">04 Method</button>
+        <button disabled data-view="groups" aria-pressed="true">
+          Communities</button
+        ><button disabled data-view="influence" aria-pressed="false">
+          Influence</button
+        ><button disabled data-view="links" aria-pressed="false">
+          Link recovery</button
+        ><button disabled data-view="method" aria-pressed="false">
+          Method
+        </button>
       </nav>
-      <div id="status" role="status">Loading the saved experiment…</div>
+      <div id="status" role="status">Loading experiments…</div>
       <div id="workspace" hidden></div>
       <noscript
         >This explorer needs JavaScript. The complete

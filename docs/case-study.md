@@ -1,13 +1,17 @@
-# Network structure, influence and missing links
+# Network Explorer
 
-**Question.** When do node position and group separation give graph methods enough signal to be useful?
+[Demo](https://network.m21264551.com/) · [Code](https://github.com/m21264551-arch/network-analysis)
 
-**Approach.** Use a small observed social network and two fixed stochastic block models. Export four community partitions, centralities, paired cascade experiments and 20 complete missing-edge splits in one versioned bundle. A static explorer derives its claims from that bundle.
+On Karate Club, preferential attachment recovered held-out links better than gradient boosting: mean ROC-AUC was 0.768 versus 0.690 across 20 splits. On the weakly separated synthetic graph, the best mean was 0.500—no useful ranking signal in that experiment.
 
-**Result.** On Karate Club, preferential attachment averages 0.768 ROC-AUC, versus 0.690 for gradient boosting. On the weak SBM, the highest mean is 0.500. The failure is useful evidence that the methods do not recover a strong signal in that graph; it is not hidden behind a single favourable split.
+## Change the graph, inspect the difference
 
-**Engineering decision.** Remove row-wise CV on already-computed topology features. Rebuild the graph and all features per outer split, exclude held-out positives from every negative sampler, and sort endpoint features so an undirected pair has one representation. The export also exposes the exact test pairs for independent checking.
+The explorer compares the observed club network with two graphs containing planted communities. Switch community methods, inspect a node, or replay simulated spread from different seed sets. Community density and agreement with reference labels are displayed separately: a partition can score well on one and poorly on the other.
 
-**Failure analysis.** A high-modularity partition may disagree with the known labels. A seed strategy can select exactly the same nodes as another; common random worlds ensure identical cascades in that case. Repeated splits of one graph are dependent and cannot establish a universally best method.
+## Rebuild features after removing edges
 
-**Next limitation.** Three small fixed graphs provide controlled examples, not a broad benchmark. A temporal network dataset would be needed before claiming genuine future-link prediction.
+Every link-recovery split removes test edges before computing graph features. Training pairs exclude their own edge, and undirected features have the same representation when endpoints swap. One export contains the graph, partitions, trial results and exact held-out pairs, so the charts and downloads stay consistent. Spread comparisons share random propagation trials; identical seed sets therefore produce identical reach.
+
+## Small graphs limit the conclusion
+
+Repeated splits reuse the same topology and are not independent datasets. Holding out edges while preserving connectivity also leaves bridges untested. The spread model describes an assumed diffusion process, not observed human behaviour. These experiments explain graph methods; they do not establish a general winner.
