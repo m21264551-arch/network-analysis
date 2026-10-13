@@ -1,0 +1,13 @@
+{
+  "name": "network-structure-explorer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:browser": "playwright test",
+    "build": "node scripts/build-static.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.0",
+    "@axe-core/playwright": "4.11.3"
+  }
+}
