@@ -4,7 +4,7 @@
 
 [Open the explorer](https://network.m21264551.com) · [Case study](docs/case-study.md)
 
-![Graph-first experiment](outputs/explorer-desktop.png)
+![Graph-first experiment](docs/compact-desktop.jpg)
 
 ## Walkthrough
 
