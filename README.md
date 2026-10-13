@@ -59,6 +59,7 @@ For browser checks in another terminal:
 npm ci
 npx playwright install chromium
 npm run test:browser
+npm run build
 ```
 
 The existing analysis CLI and LFR generator remain available (`python main.py --help`). The export records code revision, source checksum, dataset checksums, seeds, parameters, graph coordinates, exact partitions, all split pairs, scores and diffusion reaches. Timestamps and code revisions differ between exports; the numerical experiments are deterministic in the pinned scientific environment.
