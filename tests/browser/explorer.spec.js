@@ -149,5 +149,35 @@ for(const [width,height] of [[1280,720],[800,900],[390,844]]) test(`graph fits a
  await page.getByRole("heading",{name:"Node 0",exact:true}).waitFor();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);
  const box=await page.locator('.plot svg').boundingBox(); expect(box.y).toBeLessThan(height-200);
- await page.screenshot({path:`../../outputs/refined-network-${width}.png`});
+ await page.screenshot({path:`../../outputs/distinct-tested-network-${width}.png`});
+});
+
+test('partition comparison synchronizes coordinates, pan, selection and keyboard focus', async ({page}) => {
+  await page.setViewportSize({width:1280,height:720});
+  await page.goto('/?source=portfolio');
+  await page.getByRole('button',{name:'Compare partitions',exact:true}).click();
+  const primary=page.locator('.graph-canvas[data-pane="primary"]');
+  const other=page.locator('.graph-canvas[data-pane="comparison"]');
+  const positions=svg=>svg.locator('.node circle:first-child').evaluateAll(ns=>ns.map(n=>[n.getAttribute('cx'),n.getAttribute('cy')]));
+  expect(await positions(primary)).toEqual(await positions(other));
+  const before=await positions(primary);
+  await page.getByRole('button',{name:'Zoom in',exact:true}).click();
+  await primary.focus();await primary.press('ArrowRight');
+  const viewport=await primary.getAttribute('data-viewport');
+  await expect(other).toHaveAttribute('data-viewport',viewport);
+  await other.locator('[data-node="33"]').focus();await page.keyboard.press('Enter');
+  await expect(other.locator('[data-node="33"]')).toBeFocused();
+  await expect(page.getByRole('combobox',{name:'Select node',exact:true})).toHaveValue('33');
+  await page.getByRole('combobox',{name:'Compare with',exact:true}).selectOption('Girvan-Newman');
+  expect(await positions(primary)).toEqual(before);
+  expect(await positions(other)).toEqual(before);
+  await expect(primary).toHaveAttribute('data-viewport',viewport);
+  await other.focus();await page.setViewportSize({width:390,height:844});
+  await expect(other).toBeFocused();
+  await expect(other).toHaveAttribute('data-viewport',viewport);
+  expect(await positions(primary)).toEqual(await positions(other));
+  await other.press('Home');
+  await expect(primary).toHaveAttribute('data-viewport',JSON.stringify({zoom:1,x:0,y:0}));
+  const waiting=page.waitForEvent('download');await page.getByRole('button',{name:'Download data'}).click();
+  const d=await waiting;expect(JSON.parse(fs.readFileSync(await d.path(),'utf8')).experiments[0]).toEqual(bundle.experiments[0]);
 });
