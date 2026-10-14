@@ -46,6 +46,12 @@ aside p { font-size:13px; }
 .experiment aside select { width:100%; }
 figure { margin:0; }
 .plot { background:#f5f8f3; border:1px solid #e1e7df; overflow:hidden; }
+.node-reading { margin:0; padding:8px 12px; font-size:12px; border-bottom:1px solid var(--line); }
+.node-reading a { display:inline-flex; min-height:30px; align-items:center; margin-left:8px; }
+.node-meaning { font-weight:550; }
+.disagreement-nodes { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
+.disagreement-nodes button { font-size:12px; }
+.pair-explanation { margin:12px 0; }
 .plot svg { display:block; width:100%; height:auto; touch-action:pan-y; cursor:grab; }
 .plot svg:active { cursor:grabbing; }
 .plot figcaption { padding:10px 12px; font-size:12px; border-top:1px solid #dfe7db; color:#526453; }
@@ -142,8 +148,13 @@ footer { border-top:1px solid var(--line); margin:24px 0; padding-top:14px; font
 @media(max-width:600px) {
  .viewport-controls { flex-wrap:wrap; }
  .node-navigation { gap:4px; }
- .node-navigation span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+ .node-navigation span { position:static; width:auto; height:auto; overflow:visible; clip:auto; }
+ #inspect-selected { display:none; }
  #inspect-selected { padding-inline:6px; }
  .viewport-controls button { flex-shrink:0; }
  .comparison-reading { align-items:start; }
 }
+
+.view-options { position:relative; margin:0; }.view-options summary { padding:10px 12px; border:1px solid #b4c3b8; border-radius:4px; }
+.view-options-body { position:absolute; top:48px; right:0; z-index:3; min-width:240px; padding:12px; border:1px solid var(--line); background:#fff; box-shadow:0 3px 8px #20382b15; }.view-options-body>div { display:flex; gap:6px; margin-bottom:10px; }.view-options-body label { min-width:0; }
+@media(max-width:600px) { .viewport-controls { margin-bottom:6px; }.node-reading { display:flex; align-items:center; padding:6px 8px; gap:8px; }.node-reading a { margin-left:auto; white-space:nowrap; }.controls { margin-bottom:6px; } #description { line-height:1.4; } #download { padding-block:2px; min-height:36px; } }

@@ -161,6 +161,7 @@ test('partition comparison synchronizes coordinates, pan, selection and keyboard
   const positions=svg=>svg.locator('.node circle:first-child').evaluateAll(ns=>ns.map(n=>[n.getAttribute('cx'),n.getAttribute('cy')]));
   expect(await positions(primary)).toEqual(await positions(other));
   const before=await positions(primary);
+  await page.getByText('View',{exact:true}).click();
   await page.getByRole('button',{name:'Zoom in',exact:true}).click();
   await primary.focus();await primary.press('ArrowRight');
   const viewport=await primary.getAttribute('data-viewport');
@@ -198,7 +199,7 @@ test('one graph Tab stop supports directional inspection and explicit partition 
  await page.getByRole('button',{name:'Highlight differences',exact:true}).click();
  const primary=page.locator('.graph-canvas[data-pane="primary"]');
  const expected=await primary.locator('[data-disagreement="true"]').count();
- await expect(page.locator('.comparison-reading')).toContainText(`${expected} nodes differ`);
+ await expect(page.locator('.comparison-reading')).toContainText(`${expected} nodes change groups`);
  await expect(page.getByRole('combobox',{name:'Select node',exact:true})).toHaveValue(selected);
  await page.getByRole('button',{name:'Node details'}).click();
  await expect(page.getByRole('heading',{name:`Node ${selected}`,exact:true})).toBeFocused();
@@ -214,9 +215,28 @@ test('desktop influence action stays beside its visible graph',async({page})=>{
 
 test('keyboard selection pans only enough to keep a zoomed node visible',async({page})=>{
  await page.goto('/');const canvas=page.locator('.graph-canvas');await canvas.waitFor();
+ await page.getByText('View',{exact:true}).click();
  for(let i=0;i<4;i++) await page.getByRole('button',{name:'Zoom in',exact:true}).click();
  await page.getByRole('combobox',{name:'Select node',exact:true}).selectOption('14');
  const box=await canvas.boundingBox(),marker=await page.locator('[data-node="14"] .node-body').boundingBox();
  expect(marker.x).toBeGreaterThanOrEqual(box.x);expect(marker.x+marker.width).toBeLessThanOrEqual(box.x+box.width);
  expect(marker.y).toBeGreaterThanOrEqual(box.y);expect(marker.y+marker.height).toBeLessThanOrEqual(box.y+box.height);
+});
+
+test('node meaning and pair scores are derived from the selected saved graph',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await page.goto('/');
+ await expect(page.locator('.node-reading')).toContainText('16 connections · betweenness rank 1 of 34');
+ expect((await page.locator('.graph-canvas').boundingBox()).y).toBeLessThan(500);
+ await page.getByRole('button',{name:'Link recovery',exact:true}).click();
+ await page.getByText('Why might a method choose this pair?',{exact:true}).click();
+ await expect(page.locator('.pair-explanation')).toContainText('Common neighbours');
+ await expect(page.locator('.pair-explanation')).toContainText('training graph');
+ await page.getByRole('button',{name:'Show withheld links'}).click();
+ await expect(page.locator('.pair-explanation')).toContainText('Withheld link');
+});
+test('recovery returns keyboard focus to the node selector',async({page})=>{
+ await page.route('**/data/experiments.json',r=>r.abort());await page.goto('/');
+ await expect(page.getByRole('button',{name:'Try again'})).toBeVisible();
+ await page.unroute('**/data/experiments.json');await page.getByRole('button',{name:'Try again'}).click();
+ await expect(page.getByRole('combobox',{name:'Select node',exact:true})).toBeFocused();
 });
