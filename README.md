@@ -4,11 +4,11 @@
 
 [Open the explorer](https://network.m21264551.com) · [Case study](docs/case-study.md)
 
-![Graph-first experiment](docs/compact-desktop.jpg)
+![Graph-first experiment](docs/workspace-desktop.png)
 
 ## Walkthrough
 
-1. Compare the observed Karate Club split with four community algorithms.
+1. Use **Compare partitions** to inspect the Karate Club reference groups beside a community algorithm. Both panes share coordinates, pan/zoom and node selection.
 2. Switch to strong or weak planted groups and inspect where agreement breaks down.
 3. Compare seed strategies across paired propagation trials. Step through a saved cascade.
 4. Examine missing-link recovery across 20 outer splits, including cases where a learned model loses.
@@ -58,13 +58,14 @@ For browser checks in another terminal:
 ```sh
 npm ci
 npx playwright install chromium
+npm run test:unit
 npm run test:browser
 npm run build
 ```
 
 The existing analysis CLI and LFR generator remain available (`python main.py --help`). The export records code revision, source checksum, dataset checksums, seeds, parameters, graph coordinates, exact partitions, all split pairs, scores and diffusion reaches. Timestamps and code revisions differ between exports; the numerical experiments are deterministic in the pinned scientific environment.
 
-Tests cover generation determinism, graph/attribute preservation, valid negative sampling, absent held-out edges, symmetric features, paired cascades, export consistency and UI/download parity. Browser checks cover keyboard node inspection, relevant controls, missing-data recovery, mobile layout and axe accessibility. CI runs both suites.
+Tests cover generation determinism, graph/attribute preservation, valid negative sampling, absent held-out edges, symmetric features, paired cascades, export consistency and UI/download parity. Browser checks cover keyboard node inspection, relevant controls, missing-data recovery, mobile layout and axe accessibility. Display-colour matching maximizes membership overlap without relabelling the saved partitions. CI also checks synchronized comparison, viewport and focus preservation.
 
 ## Limits and tradeoffs
 

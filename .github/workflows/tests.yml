@@ -30,5 +30,6 @@ jobs:
           node-version: '20'
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - run: npm run test:unit
       - run: npm run test:browser
       - run: npm run build
