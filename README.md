@@ -1,6 +1,6 @@
 # Network Structure Explorer
 
-**How do community structure and node position affect influence and missing-link recovery?**
+Compare communities, simulated spread, and link recovery on three small graphs.
 
 [Open the explorer](https://network.m21264551.com) · [Case study](docs/case-study.md)
 
@@ -13,7 +13,7 @@
 3. Compare seed strategies across paired propagation trials. Step through a saved cascade.
 4. Examine missing-link recovery across 20 outer splits, including cases where a learned model loses.
 
-Every count, partition, metric, summary, replay and download comes from `data/experiments.json` (schema v1). Browser controls select bounded precomputed experiments; no analysis server is required. A labelled community key and persistent node details accompany the graph. Tab enters each graph once; arrow keys inspect nearby nodes, Shift + arrow keys pan, and the node selector reaches every node. Keyboard inspection keeps zoomed nodes in view.
+Every count, partition, metric, summary, replay and download comes from `data/experiments.json` (schema v1). Browser controls select bounded precomputed experiments. No analysis server is required. A labelled community key and persistent node details accompany the graph. Tab enters each graph once. Arrow keys inspect nearby nodes, Shift + arrow keys pan, and the node selector reaches every node. Keyboard inspection keeps zoomed nodes in view.
 
 ## Data and protocol
 
@@ -21,13 +21,13 @@ Every count, partition, metric, summary, replay and download comes from `data/ex
 - **Strong SBM:** four groups of 20, within-group probability 0.30, between-group probability 0.015.
 - **Weak SBM:** four groups of 20, probabilities 0.18 and 0.08.
 
-Graphs are unweighted and undirected. Generation, layout and algorithm seeds are fixed and exported. Louvain and label propagation choose partitions; Girvan–Newman and spectral clustering receive the reference group count. Spectral clustering embeds the smallest non-trivial normalized-Laplacian eigenvectors then applies k-means. Modularity evaluates internal connectivity; NMI/adjusted Rand evaluate agreement with reference labels. They are not interchangeable.
+Graphs are unweighted and undirected. Generation, layout and algorithm seeds are fixed and exported. Louvain and label propagation choose partitions. Girvan–Newman and spectral clustering receive the reference group count. Spectral clustering embeds the smallest non-trivial normalized-Laplacian eigenvectors then applies k-means. Modularity evaluates internal connectivity. NMI/adjusted Rand evaluate agreement with reference labels. They are not interchangeable.
 
-Link recovery holds out approximately 15% of edges over seeds 0–19 while preserving connectivity. Negatives are balanced true non-edges from the original graph. Held-out pairs never enter training negatives. Features are recomputed on each split's remaining graph; a positive training pair's own edge is temporarily removed. Min/max endpoint features make undirected pairs invariant to endpoint order. The fixed gradient-boosting challenger uses 200 estimators, depth 3 and learning rate 0.05. There is no row-wise CV over cached topology features.
+Link recovery holds out approximately 15% of edges over seeds 0–19 while preserving connectivity. Negatives are balanced true non-edges from the original graph. Held-out pairs never enter training negatives. Features are recomputed on each split's remaining graph. A positive training pair's own edge is temporarily removed. Min/max endpoint features make undirected pairs invariant to endpoint order. The fixed gradient-boosting challenger uses 200 estimators, depth 3 and learning rate 0.05.
 
 Independent Cascade compares PageRank, degree, betweenness and one fixed random seed set. Each seed count (1/3/5) and propagation probability (0.05/0.1/0.2) has 100 paired directed live-edge worlds. Strategies see the same world within a trial. Reported spread variability is a standard deviation, not a confidence interval or observed human behaviour.
 
-## Reproduced results
+## Results
 
 Mean ROC-AUC across the 20 outer splits:
 
@@ -63,10 +63,10 @@ npm run test:browser
 npm run build
 ```
 
-The existing analysis CLI and LFR generator remain available (`python main.py --help`). The export records code revision, source checksum, dataset checksums, seeds, parameters, graph coordinates, exact partitions, all split pairs, scores and diffusion reaches. Timestamps and code revisions differ between exports; the numerical experiments are deterministic in the pinned scientific environment.
+The existing analysis CLI and LFR generator remain available (`python main.py --help`). The export records code revision, source checksum, dataset checksums, seeds, parameters, graph coordinates, exact partitions, all split pairs, scores and diffusion reaches. Timestamps and code revisions differ between exports. The numerical experiments are deterministic in the pinned scientific environment.
 
 Tests cover generation determinism, graph/attribute preservation, valid negative sampling, absent held-out edges, symmetric features, paired cascades, export consistency and UI/download parity. Browser checks cover keyboard node inspection, relevant controls, missing-data recovery, mobile layout and axe accessibility. Display-colour matching maximizes membership overlap without relabelling the saved partitions. CI also checks synchronized comparison, viewport and focus preservation.
 
 ## Limits and tradeoffs
 
-The static bundle makes publication auditable and browsing cheap. It deliberately limits visitors to curated experiments. Connectivity preservation excludes bridge edges from the link task; balanced negatives do not represent real missing-link prevalence. Training edges are locally removed for features, but a single static graph still differs from a temporal prediction task. The synthetic groups are planted by construction. More complex models or visually attractive partitions are not automatically better.
+The browser reads a saved bundle, so it needs no analysis server. Visitors can only choose from the exported experiments. Connectivity preservation excludes bridge edges from the link task. Balanced negatives do not represent real missing-link prevalence. Training edges are locally removed for features, but a single static graph still differs from a temporal prediction task. The synthetic groups are planted by construction. More complex models or visually attractive partitions are not automatically better.
